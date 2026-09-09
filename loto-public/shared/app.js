@@ -2,7 +2,7 @@
   const C=window.CFG||{};
   const kind=String(C.name||location.hostname).toLowerCase().includes('7')?'loto7':'loto6';
   const label=kind==='loto7'?'LOTO7':'LOTO6';
-  const files=kind==='loto7'?['k1.js','k2.js','k3.js','k4.js','k5.js','k6.js']:['j1.js','j2.js','j3.js'];
+  const files=kind==='loto7'?['k1.js','k2.js','k3.js','k4.js','k5.js','k6.js']:['l6n1.js','l6n2.js','l6n3.js','l6n4.js','l6n5.js','l6n6.js'];
   const path=`loto-public/full/${kind}/`;
   const bases=[
     `https://cdn.jsdelivr.net/gh/nbm45380-art/virtual-jumbo-2026@loto-public-apps-v3/${path}`,
@@ -14,7 +14,7 @@
   const tryScript=(url,n,total)=>new Promise((resolve,reject)=>{
     const s=document.createElement('script');
     const timer=setTimeout(()=>{s.remove();reject(new Error(`タイムアウト`));},5000);
-    s.src=url+(url.includes('?')?'&':'?')+'v=20260909-6';
+    s.src=url+(url.includes('?')?'&':'?')+'v=20260909-7';
     s.async=false;
     s.onload=()=>{clearTimeout(timer);resolve();};
     s.onerror=()=>{clearTimeout(timer);s.remove();reject(new Error('読込失敗'));};
