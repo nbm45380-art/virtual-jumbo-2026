@@ -1,9 +1,13 @@
 (()=>{
   const C=window.CFG||{};
   const kind=String(C.name||location.hostname).toLowerCase().includes('7')?'loto7':'loto6';
-  const label=kind==='loto7'?'LOTO7':'LOTO6';
-  const files=kind==='loto7'?['k1.js','k2.js','k3.js','k4.js','k5.js','k6.js']:['l6n1.js','l6n2.js','l6n3.js','l6n4.js','l6n5.js','l6n6.js'];
-  const path=`loto-public/full/${kind}/`;
+  if(kind==='loto6'){
+    location.replace('https://rawcdn.githack.com/nbm45380-art/virtual-jumbo-2026/4087451a898f840fe75648f77266a08a53ccd016/loto-public/full/loto6/direct-loader.html');
+    return;
+  }
+  const label='LOTO7';
+  const files=['k1.js','k2.js','k3.js','k4.js','k5.js','k6.js'];
+  const path='loto-public/full/loto7/';
   const bases=[
     `https://cdn.jsdelivr.net/gh/nbm45380-art/virtual-jumbo-2026@loto-public-apps-v3/${path}`,
     `https://raw.githack.com/nbm45380-art/virtual-jumbo-2026/loto-public-apps-v3/${path}`,
@@ -13,8 +17,8 @@
   const failBox=(msg)=>{setText('freshTitle','🔴 完全版の読み込みに失敗');setText('freshMeta',msg);setText('range','再読み込みしてください');const src=document.getElementById('source');if(src)src.innerHTML=`${msg}<br><button onclick="location.reload()" style="margin-top:8px;padding:8px 12px">再読み込み</button>`;};
   const tryScript=(url,n,total)=>new Promise((resolve,reject)=>{
     const s=document.createElement('script');
-    const timer=setTimeout(()=>{s.remove();reject(new Error(`タイムアウト`));},5000);
-    s.src=url+(url.includes('?')?'&':'?')+'v=20260909-7';
+    const timer=setTimeout(()=>{s.remove();reject(new Error('タイムアウト'));},5000);
+    s.src=url+(url.includes('?')?'&':'?')+'v=20260909-8';
     s.async=false;
     s.onload=()=>{clearTimeout(timer);resolve();};
     s.onerror=()=>{clearTimeout(timer);s.remove();reject(new Error('読込失敗'));};
