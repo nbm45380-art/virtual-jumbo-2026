@@ -1,0 +1,2555 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>カード・トライアングル v2.0.1｜CPU初期・対人3分交代モード</title>
+  <style>
+    :root{
+      --bg:#f6fbff;
+      --panel:#ffffff;
+      --ink:#0f172a;
+      --muted:#475569;
+      --line:#e2e8f0;
+
+      --accent:#2563eb;   /* YOU */
+      --accent2:#06b6d4;
+      --cpu:#ff4d6d;      /* CPU */
+
+      --good:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+
+      --shadow: 0 10px 30px rgba(15, 23, 42, .10);
+      --r:16px;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(800px 400px at 15% 10%, rgba(37,99,235,.10), transparent 60%),
+        radial-gradient(700px 380px at 85% 20%, rgba(6,182,212,.12), transparent 55%),
+        radial-gradient(900px 420px at 50% 100%, rgba(16,185,129,.10), transparent 60%),
+        var(--bg);
+    }
+    .wrap{max-width:1200px;margin:18px auto 40px;padding:0 14px 24px;}
+    header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+    .title{display:flex;flex-direction:column;gap:4px;}
+    .title h1{margin:0;font-size:22px;letter-spacing:.2px;}
+    .title .sub{font-size:12.5px;color:var(--muted);line-height:1.35;}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;}
+    button, select, label.chk{
+      font:inherit;border-radius:12px;border:1px solid var(--line);
+      background:var(--panel);padding:9px 12px;cursor:pointer;
+      box-shadow:0 2px 0 rgba(15,23,42,.03);
+    }
+    label.chk{display:inline-flex;align-items:center;gap:8px;user-select:none;}
+    label.chk input{transform:scale(1.1);}
+    button.primary{
+      background:linear-gradient(180deg, rgba(37,99,235,1), rgba(37,99,235,.90));
+      border-color:rgba(37,99,235,.55);
+      color:#fff;
+    }
+    button.ghost{background:transparent;}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
+      border:1px solid var(--line);background:rgba(255,255,255,.75);
+      box-shadow:var(--shadow);backdrop-filter: blur(6px);
+    }
+    .pill strong{font-size:13px;}
+    .grid{display:grid;grid-template-columns: minmax(0,2.2fr) minmax(260px,.8fr);gap:12px;}
+    @media (max-width: 980px){.grid{grid-template-columns:1fr;}}
+    .panel{
+      background:rgba(255,255,255,.86);
+      border:1px solid var(--line);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .panel .hd{
+      display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.72));
+    }
+    .panel .hd h2{margin:0;font-size:14px;letter-spacing:.2px;}
+    .panel .bd{padding:12px 14px 14px;}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+    .kpi{display:grid;grid-template-columns: repeat(4, minmax(0,1fr));gap:10px;margin-top:10px;}
+    @media (max-width: 980px){.kpi{grid-template-columns:repeat(2, minmax(0,1fr));}}
+    .kcard{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.70);padding:10px 12px;}
+    .kcard .k{font-size:12px;color:var(--muted);}
+    .kcard .v{font-size:18px;font-weight:800;margin-top:2px;}
+    .kcard .s{font-size:12px;color:var(--muted);margin-top:2px;}
+
+    .turnBanner{
+      display:flex;gap:10px;align-items:center;justify-content:space-between;
+      border:1px dashed rgba(37,99,235,.35);
+      background:rgba(37,99,235,.06);
+      border-radius:14px;
+      padding:10px 12px;
+      margin-top:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .turnBanner.warn{
+      border-color:rgba(239,68,68,.40);
+      background:rgba(239,68,68,.06);
+    }
+    @keyframes pulse10{
+      0%,100%{ transform: translateZ(0); filter: saturate(1); }
+      50%{ transform: translateZ(0) scale(1.01); filter: saturate(1.2); }
+    }
+    .turnBanner.pulse{ animation: pulse10 .6s infinite; }
+
+    /* ビルド残り時間プログレス（うっすら） */
+    .buildBar{
+      position:absolute; inset:0;
+      width:0%;
+      background: linear-gradient(to right, rgba(37,99,235,.55), rgba(6,182,212,.45));
+      opacity:.13;
+      pointer-events:none;
+    }
+
+    .turnBanner .big{font-size:14px;font-weight:800; position:relative; z-index:1;}
+    .turnBanner .small{font-size:12px;color:var(--muted); position:relative; z-index:1;}
+
+    .dotsRow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px; position:relative; z-index:1;}
+    .dotsBlock{
+      display:inline-flex;align-items:center;gap:6px;
+      border:1px solid var(--line);border-radius:999px;
+      background:rgba(255,255,255,.70);
+      padding:4px 8px;
+      font-size:12px;color:var(--muted);
+    }
+    .dotsBlock .label{font-weight:800;color:var(--ink);}
+    .dot{font-weight:900; letter-spacing:1px;}
+    .dot.todo{color:rgba(15,23,42,.30);}
+    .dot.you{color:rgba(37,99,235,.95);}
+    .dot.cpu{color:rgba(255,77,109,.95);}
+
+    .hand{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .hand.scrollX{
+      flex-wrap:nowrap;
+      overflow-x:auto;
+      padding-bottom:6px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .hand.grid2{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); /* 少し大きめ */
+      gap:8px;
+      align-items:stretch;
+    }
+
+    .cardBtn{
+      width:clamp(50px, 7.6vw, 62px);
+      height:clamp(66px, 10.0vw, 80px);
+      min-width:50px;
+      border-radius:12px;border:1px solid var(--line);
+      background:rgba(255,255,255,.9);
+      display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+      box-shadow:0 4px 14px rgba(15,23,42,.06);
+      user-select:none;
+      touch-action: manipulation;
+    }
+    .cardBtn:active{ transform:scale(0.94); box-shadow:0 2px 8px rgba(0,0,0,.2); }
+    .cardBtn .rk{font-weight:900;font-size:16px;line-height:1;}
+    .cardBtn .st{font-size:12px;color:var(--muted);line-height:1;}
+    .cardBtn.red .rk, .cardBtn.red .st{color:#dc2626;}
+
+    .cardBtn.joker{border:2px solid #7c3aed;background:linear-gradient(160deg,#faf5ff,#fff);}
+    .cardBtn.joker .rk{color:#6d28d9;font-size:19px;}
+    .cardBtn.joker .st{color:#6d28d9;font-weight:900;font-size:10px;}
+    .cardBtn.selTop{outline:3px solid rgba(37,99,235,.55);}
+    .cardBtn.selBot{outline:3px solid rgba(34,197,94,.55);}
+    .cardBtn.keyCard{outline:4px solid #f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18),0 6px 18px rgba(15,23,42,.10);position:relative;}
+    .cardBtn.keyCard::after{content:"指定";position:absolute;top:-8px;right:-8px;background:#f59e0b;color:#fff;font-size:10px;font-weight:900;padding:2px 5px;border-radius:999px;}
+    .cardBtn.giftPick{outline:4px solid #7c3aed;box-shadow:0 0 0 4px rgba(124,58,237,.16),0 6px 18px rgba(15,23,42,.10);}
+    .giftFace{display:inline-flex;align-items:center;gap:8px;border:2px solid #f59e0b;background:#fffbeb;border-radius:14px;padding:8px 12px;font-weight:900;}
+    .giftFace .bigNum{font-size:22px;}
+
+    .hint{font-size:12px;color:var(--muted);line-height:1.5;}
+    .builder{
+      display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+    }
+    .triPreview{
+      display:flex;gap:10px;align-items:flex-start;justify-content:space-between;
+      padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.70);
+    }
+    .tri{display:flex;flex-direction:column;gap:6px;min-width:240px;}
+    .tri .top{display:flex;align-items:center;gap:10px;}
+    .tri .bot{display:flex;align-items:center;gap:10px;}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:12px;
+      border:1px solid var(--line);background:rgba(255,255,255,.85);
+    }
+    .ok{color:var(--good);border-color:rgba(22,163,74,.25);background:rgba(22,163,74,.08);}
+    .ng{color:var(--bad);border-color:rgba(239,68,68,.25);background:rgba(239,68,68,.08);}
+
+    /* 数字の三角形：プレビュー・固定一覧・拡大表示で同じ図を使用 */
+    .buildWorkbench{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(275px,1fr);align-items:start;gap:12px;}
+    .handWorkspace{min-width:0;}
+    .handWorkspace .hand{margin-top:10px;}
+    .triPreview{display:grid;grid-template-columns:1fr;align-items:center;gap:10px;margin:0;padding:9px;}
+    .triDrawingZone{
+      grid-column:1 / -1;
+      border:1px solid rgba(37,99,235,.15);
+      border-radius:14px;
+      background:linear-gradient(160deg,rgba(239,246,255,.95),rgba(255,255,255,.90));
+      padding:10px 12px 12px;
+      text-align:center;
+      min-width:0;
+    }
+    .triBoardHead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;text-align:left;}
+    .triBoardHead b{font-size:14px;}
+    .triDrawing{display:flex;align-items:center;justify-content:center;min-height:180px;}
+    .triangleSvg{display:block;overflow:visible;width:100%;height:auto;max-width:350px;}
+    .triangleSvg .triNodeValue{font-family:system-ui,sans-serif;font-size:29px;font-weight:900;text-anchor:middle;dominant-baseline:middle;}
+    .triangleSvg .triNodeSuit{font-family:system-ui,sans-serif;font-size:14px;font-weight:800;text-anchor:middle;}
+    .triDrawing .triangleSvg{max-height:216px;}
+    .triEquation{font-size:16px;font-weight:850;letter-spacing:.3px;min-height:26px;}
+    .triEquation.good{color:var(--good);}
+    .triEquation.bad{color:var(--bad);}
+    .triEquation.waiting{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0;}
+    .triActions{justify-content:flex-end;width:100%;}
+    .triItem{min-height:117px;}
+    .triItem .triThumb{flex:0 0 137px;min-width:0;}
+    .triItem .triThumb .triangleSvg{max-width:137px;}
+    .triItem .triResult{display:flex;flex-direction:column;align-items:flex-end;gap:5px;text-align:right;min-width:0;}
+    .triItem .triResult .badge{white-space:normal;text-align:right;}
+    .triItem .triResult .hint{font-size:11px;}
+    .triBigRow .triangleSvg{max-width:min(530px,100%);}
+    @media (max-width:780px){
+      .buildWorkbench{grid-template-columns:1fr;}
+      .triPreview{grid-template-columns:1fr;}
+      .triDrawing{min-height:180px;}
+      .tri .top,.tri .bot{flex-wrap:wrap;gap:5px;}
+      .triItem .triThumb{flex-basis:115px;}
+      .triItem .triThumb .triangleSvg{max-width:115px;}
+      .triItem .triResult .badge{font-size:11px;}
+    }
+    /* 2フェーズを最初から見せる進行ガイド */
+    .phaseRoadmap{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr);gap:8px;align-items:stretch;margin-bottom:12px;}
+    .phaseStep{border-radius:16px;padding:12px 14px;border:2px solid var(--line);background:#f8fafc;opacity:.72;min-width:0;transition:background .15s,border-color .15s;}
+    .phaseStep .phaseNum{display:inline-block;font-size:11px;font-weight:850;border-radius:999px;padding:3px 8px;background:#e2e8f0;color:#334155;}
+    .phaseStep .phaseName{font-size:18px;font-weight:900;margin:7px 0 5px;}
+    .phaseStep .phaseDesc{font-size:12px;line-height:1.55;color:var(--muted);}
+    .phaseStep .phaseState{display:inline-block;margin-top:8px;font-size:12px;font-weight:850;}
+    .phaseStep.active{opacity:1;border-color:#2563eb;background:linear-gradient(145deg,#eaf2ff,#fff);box-shadow:0 5px 15px rgba(37,99,235,.09);}
+    .phaseStep.done{opacity:1;border-color:#86efac;background:#f0fdf4;}
+    .phaseStep.active .phaseNum{background:#2563eb;color:white;}
+    .phaseStep.done .phaseNum{background:#16a34a;color:white;}
+    .phaseStep.active .phaseState{color:#1d4ed8;}
+    .phaseStep.done .phaseState{color:#15803d;}
+    .phaseArrow{display:flex;align-items:center;justify-content:center;font-size:23px;color:#64748b;font-weight:900;}
+    .roadmapGoal{font-size:12px;line-height:1.5;color:var(--muted);background:#f8fafc;border-radius:11px;padding:8px 12px;margin-bottom:10px;}
+    .roadmapGoal b{color:var(--ink);}
+    .taskLine{display:flex;flex-direction:column;gap:3px;position:relative;z-index:1;margin-top:8px;border-radius:10px;background:rgba(255,255,255,.84);border:1px solid rgba(37,99,235,.14);padding:8px 10px;}
+    .taskLine b{font-size:15px;color:#1e40af;}
+    .taskLine span{font-size:12px;line-height:1.5;color:#334155;}
+    .turnBanner{align-items:stretch;}
+    .turnBanner .turnContent{flex:1;min-width:0;}
+    .turnBanner .turnActions{align-content:center;justify-content:flex-end;max-width:230px;}
+    .turnBanner .turnActions button{max-width:100%;white-space:normal;line-height:1.4;}
+    .drawArea{margin-top:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.70);}
+    .builder.draw-mode .drawArea{order:-1;margin-top:0;}
+    .builder.draw-mode .buildWorkbench{order:0;}
+    .drawArea.draw-ready{background:#eff6ff;border:2px solid #2563eb;box-shadow:0 6px 17px rgba(37,99,235,.10);}
+    .drawArea.draw-done{background:#f8fafc;border:1px solid #cbd5e1;}
+    .drawArea.draw-done .backs{opacity:.52;}
+    .drawArea .drawTitle{font-size:15px;}
+    .handWorkspace .handTitle{font-size:14px;font-weight:850;}
+    .handWorkspace .handInstruction{color:#1d4ed8;font-weight:750;}
+    .drawArea .drawTitle .badge{vertical-align:middle;}
+    .back{transition:transform .1s;}
+    .back[aria-disabled="true"]{cursor:default;filter:grayscale(.6);}
+    .back[aria-disabled="false"]:hover{transform:translateY(-3px);outline:2px solid #2563eb;}
+    .backs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+    .back{
+      width:44px;height:60px;border-radius:12px;border:1px solid rgba(37,99,235,.30);
+      background:linear-gradient(135deg, rgba(37,99,235,.18), rgba(6,182,212,.18));
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 14px rgba(15,23,42,.06);
+      cursor:pointer;user-select:none;
+      touch-action: manipulation;
+    }
+    .back span{font-size:12px;color:rgba(15,23,42,.65);font-weight:800;}
+    @media (max-width:680px){
+      header{flex-direction:column;align-items:stretch;}
+      header .title{width:100%;}
+      header .title h1{font-size:20px;overflow-wrap:anywhere;}
+      header .controls{width:100%;justify-content:flex-start;gap:6px;}
+      header .controls .pill{box-shadow:none;padding:5px 8px;}
+      header .controls .pill select{max-width:156px;}
+      header .controls button{padding:7px 9px;}
+      .phaseRoadmap{grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:3px;}
+      .phaseStep{padding:9px 10px;}
+      .phaseStep .phaseName{font-size:15px;}
+      .phaseStep .phaseDesc{font-size:11px;}
+      .phaseArrow{font-size:18px;}
+      .turnBanner{flex-direction:column;}
+      .turnBanner .turnActions{justify-content:flex-start;max-width:none;}
+    }
+
+    .log{
+      max-height:360px;overflow:auto;font-size:12px;line-height:1.5;
+      padding:8px 10px;border-radius:14px;border:1px solid var(--line);
+      background:rgba(255,255,255,.70);
+    }
+    .logLine{white-space:pre-wrap;}
+    .logStar{
+      background:rgba(37,99,235,.12);
+      padding:4px 8px;
+      border-radius:10px;
+      margin:4px 0;
+      font-weight:700;
+    }
+
+    .twoCols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    @media (max-width: 980px){.twoCols{grid-template-columns:1fr;}}
+    .triList{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;padding-right:2px;}
+    .triItem{
+      border:1px solid var(--line);border-radius:14px;padding:8px 10px;background:rgba(255,255,255,.70);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      cursor:pointer;
+      user-select:none;
+      touch-action: manipulation;
+    }
+    .triItem:hover{ filter:saturate(1.05); }
+    .triItem:active{ transform: scale(.995); }
+    .triItem .lhs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .miniCard{
+      width:40px;height:54px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.92);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+      box-shadow:0 4px 14px rgba(15,23,42,.05);
+    }
+    .miniCard .rk{font-weight:900;font-size:14px;line-height:1;}
+    .miniCard .st{font-size:11px;color:var(--muted);line-height:1;}
+    .miniCard.red .rk, .miniCard.red .st{color:#dc2626;}
+    .smallBtn{padding:7px 10px;border-radius:12px;font-size:12px;}
+    .footerHint{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.6;}
+
+    #fxCanvas{position:fixed;inset:0;pointer-events:none;z-index:9997;}
+    .modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;padding:14px;z-index:9998;}
+    .modal.show{display:flex;}
+    .modal .box{width:min(920px, 100%);background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;}
+    .modal .box .mh{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.78));}
+    .modal .box .mh .t{font-weight:900;}
+    .modal .box .mb{padding:12px 14px 14px;}
+    .rule{font-size:13px;color:var(--muted);line-height:1.75;}
+    #rulesModal .box{max-height:calc(100dvh - 28px);display:flex;flex-direction:column;}
+    #rulesModal .mb{overflow-y:auto;min-height:0;}
+    .rule h3{margin:18px 0 7px;font-size:16px;color:var(--ink);line-height:1.35;}
+    .rule h3:first-child{margin-top:0;}
+    .rule p{margin:6px 0 10px;}
+    .rule ul,.rule ol{margin:6px 0 12px;padding-left:1.5em;}
+    .rule li{margin:5px 0;}
+    .rule .ruleExample{padding:9px 11px;margin:8px 0 12px;border-radius:11px;background:#f8fafc;border:1px solid var(--line);color:#334155;}
+    .rule .ruleImportant{padding:10px 12px;margin:9px 0 13px;border-radius:11px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+
+    /* モーダル・ポップアニメ */
+    @keyframes modalPop{0%{opacity:0;transform:scale(.92);}100%{opacity:1;transform:scale(1);} }
+    .modal.show .box{ animation: modalPop 220ms ease-out; }
+
+    .triBigRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:10px;}
+    .bigCard{
+      width:84px;height:112px;border-radius:16px;border:1px solid var(--line);
+      background:rgba(255,255,255,.96);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+      box-shadow:0 12px 26px rgba(15,23,42,.10);
+    }
+    .bigCard .rk{font-weight:950;font-size:28px;line-height:1;}
+    .bigCard .st{font-size:18px;color:var(--muted);line-height:1;}
+    .bigCard.red .rk, .bigCard.red .st{color:#dc2626;}
+
+    .flash{
+      position:fixed;inset:0;pointer-events:none;z-index:9997;opacity:0;
+      background:radial-gradient(800px 400px at 50% 30%, rgba(255,255,255,.8), rgba(255,255,255,0) 65%);
+    }
+    @keyframes flashPop{
+      0%{opacity:0;}
+      15%{opacity:.85;}
+      100%{opacity:0;}
+    }
+    .flash.go{animation: flashPop 600ms ease-out 0ms 1;}
+    .seriesHero{
+      display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;
+      padding:6px 4px 0;
+    }
+    .seriesHero .winner{
+      font-weight:950;
+      font-size:28px;
+      letter-spacing:.4px;
+    }
+    .seriesHero .scoreLine{
+      font-size:14px;color:var(--muted);
+      background:rgba(255,255,255,.70);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:8px 12px;
+      display:inline-block;
+    }
+    .seriesHero .note{font-size:12px;color:var(--muted);}
+    .seriesHero .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px;}
+
+    /* ラウンド結果：大きな勝敗表示＋判定に使った数値の比較 */
+    #roundModal .box{width:min(720px,100%);max-height:calc(100dvh - 26px);display:flex;flex-direction:column;background:#fff;}
+    #roundModal .mb{overflow-y:auto;min-height:0;}
+    .roundHero{text-align:center;padding:15px 10px;border-radius:17px;background:#eff6ff;border:1px solid #bfdbfe;}
+    .roundHero.cpu{background:#fff1f2;border-color:#fecdd3;}
+    .roundHero.draw{background:#f8fafc;border-color:#cbd5e1;}
+    .roundHero .resultEyebrow{color:#475569;font-weight:800;font-size:12px;letter-spacing:.08em;}
+    .roundHero .resultWinner{font-size:clamp(25px,5.4vw,35px);font-weight:950;margin:4px 0;color:#1d4ed8;}
+    .roundHero.cpu .resultWinner{color:#be123c;}
+    .roundHero.draw .resultWinner{color:#334155;}
+    .roundHero .resultReason{font-size:14px;line-height:1.65;font-weight:700;color:#334155;}
+    .roundCompare{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;margin:12px 0;overflow:hidden;border:1px solid #cbd5e1;border-radius:12px;}
+    .roundCompare th,.roundCompare td{padding:10px 8px;text-align:center;border-bottom:1px solid #e2e8f0;}
+    .roundCompare tr:last-child th,.roundCompare tr:last-child td{border-bottom:0;}
+    .roundCompare th:first-child{font-size:12px;text-align:left;color:#475569;font-weight:700;}
+    .roundCompare thead th{background:#f1f5f9;font-size:12px;}
+    .roundCompare td{font-weight:850;font-size:17px;font-variant-numeric:tabular-nums;}
+    .roundCompare tr.decisive{background:#eff6ff;}
+    .roundCompare tr.decisive th:first-child::after{content:' ★';color:#2563eb;}
+    .roundCompare td.best{color:#15803d;}
+    .roundPoint{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:8px 0;}
+    .roundPointCard{background:#eff6ff;border:1px solid #bfdbfe;border-radius:13px;padding:12px;text-align:center;}
+    .roundPointCard.cpu{background:#fff1f2;border-color:#fecdd3;}
+    .roundPointCard .ptLabel{display:block;font-size:12px;font-weight:850;}
+    .roundPointCard .ptValue{display:block;font-size:28px;font-weight:950;line-height:1.3;}
+    .roundPointCard .ptTotal{display:block;font-size:12px;color:#475569;}
+    .roundExplain{text-align:center;font-size:12px;color:#475569;line-height:1.5;margin:8px 0;}
+    .roundActions{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:13px;}
+    .roundActions button{font-weight:800;min-height:46px;}
+    .roundActions .primary{font-size:15px;}
+    .roundInline{margin-top:10px;padding:10px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:13px;}
+    .roundInline[hidden]{display:none;}
+    .roundInline b{display:block;color:#166534;font-size:15px;}
+    .roundInline span{display:block;font-size:12px;line-height:1.5;margin:4px 0 9px;}
+    @media(max-width:460px){
+      #roundModal .mb{padding:10px;}
+      .roundCompare th,.roundCompare td{padding:8px 3px;}
+      .roundCompare td{font-size:16px;}
+      .roundActions{flex-direction:column;}
+      .roundActions button{width:100%;}
+    }
+
+    .handoffScreen{position:fixed;inset:0;z-index:10050;background:#0f172a;color:white;display:none;align-items:center;justify-content:center;padding:20px;}
+    .handoffScreen.show{display:flex;}
+    .handoffBox{width:min(560px,100%);text-align:center;background:#111827;border:1px solid #334155;border-radius:22px;padding:28px 22px;box-shadow:0 24px 70px rgba(0,0,0,.45);}
+    .handoffBox .who{font-size:30px;font-weight:950;margin:8px 0;}
+    .handoffBox .why{font-size:14px;line-height:1.7;color:#cbd5e1;margin:8px 0 18px;}
+    .handoffBox button{font-size:16px;font-weight:900;padding:12px 18px;}
+    .modeHidden{display:none !important;}
+    .grid.pvpMode{grid-template-columns:1fr;}
+  </style>
+</head>
+
+<body>
+<canvas id="fxCanvas"></canvas>
+<div class="flash" id="flash"></div>
+
+<div class="wrap">
+  <header>
+    <div class="title">
+      <h1>カード・トライアングル（2人用）v2.0.1〈CPU初期・対人3分交代モード〉</h1>
+      <div class="sub">
+        <b>対人戦は1台を交代で使い、前半は各自3分。時間切れでも残り札は自動処理しません。</b><br>
+        前半は「3枚すべて別スート」＋「上段と下段は反対色」。後半は相手の裏向き手札から1枚取り、自由に最大1組作る3ターン戦。各自ジョーカー1枚（値0・任意スート／色）。
+      </div>
+    </div>
+
+    <div class="controls">
+      <span class="pill">
+        <strong>対戦モード</strong>
+        <select id="gameMode">
+          <option value="pvp">対人（1台を交代）</option>
+          <option value="cpu" selected>CPU対戦</option>
+        </select>
+      </span>
+
+      <span class="pill" id="cpuLevelPill">
+        <strong>CPU強さ</strong>
+        <select id="cpuLevel">
+          <option value="0">弱（ランダム寄り）</option>
+          <option value="1" selected>中（貪欲）</option>
+          <option value="2">強（評価関数＋先読み）</option>
+        </select>
+      </span>
+
+      <span class="pill" title="後半は1ターンにつき三角形を最大1組固定できます">
+        <strong>後半ルール</strong>
+        <select id="drawFixMax" disabled>
+          <option value="1" selected>1ターン最大1組</option>
+        </select>
+      </span>
+
+      <span class="pill">
+        <strong>手札ソート</strong>
+        <select id="handSort">
+          <option value="rank" selected>ランク順</option>
+          <option value="valueDesc">値降順（K→A）</option>
+          <option value="topValue">上段値降順（A=14考慮）</option>
+        </select>
+      </span>
+
+      <label class="chk pill" title="ビルド残り10秒でビープ＆点滅">
+        <input type="checkbox" id="endAlertOn" checked>
+        <strong>終盤アラート</strong>
+      </label>
+
+      <label class="chk pill" title="手札が0枚になった即勝時に演出する">
+        <input type="checkbox" id="fxInstantOn" checked>
+        <strong>即勝演出</strong>
+      </label>
+
+      <label class="chk pill" id="fxCpuPill" title="CPU勝利でも派手な演出を出す">
+        <input type="checkbox" id="fxCpuOn">
+        <strong>P2/CPU演出</strong>
+      </label>
+
+      <button class="ghost" id="btnRules">📖 くわしい遊び方</button>
+      <button class="ghost" id="btnNew">最初から</button>
+      <button class="primary" id="btnStart">ゲーム開始</button>
+    </div>
+  </header>
+
+  <div class="grid" id="mainGrid">
+    <section class="panel">
+      <div class="hd">
+        <h2>ゲーム盤</h2>
+        <div class="row">
+          <span class="badge"><strong>ラウンド</strong> <span id="roundNo">-</span>/<span id="seriesTotal">5</span></span>
+          <span class="badge"><strong>現在</strong> <span id="phaseText">未開始</span></span>
+          <span class="badge"><strong id="firstPlayerLabel">後半先手</strong> <span id="firstPlayerText">-</span></span>
+          <span class="badge" id="timeBadge"><strong>前半の残り</strong> <span id="buildTimeText">--:--</span></span>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="phaseRoadmap" aria-label="このラウンドの2段階">
+          <div class="phaseStep" id="stepBuild">
+            <span class="phaseNum">前半・STEP 1</span>
+            <div class="phaseName">△ 全スート別＋上下反対色ビルド</div>
+            <div class="phaseDesc" id="stepBuildDesc">自分の手札で三角形を作る。ただし<b>3枚はすべて別スート</b>、さらに<b>上段と下段2枚は反対色</b>。対人戦は各自3分ずつ交代。</div>
+            <span class="phaseState" id="stepBuildState">これから</span>
+          </div>
+          <div class="phaseArrow" aria-hidden="true">→</div>
+          <div class="phaseStep" id="stepDraw">
+            <span class="phaseNum">後半・STEP 2</span>
+            <div class="phaseName">🃏 自分で1枚引く</div>
+            <div class="phaseDesc" id="stepDrawDesc">相手の裏向き手札から<b>自分で1枚選んで取る</b>。その後、自分の手札から自由に三角形を最大1組作る。各3ターン。</div>
+            <span class="phaseState" id="stepDrawState">これから</span>
+          </div>
+        </div>
+        <div class="roadmapGoal" id="roadmapGoal"><b>勝ち方：</b>前半は「全スート別＋上下反対色」の厳しい条件で手札を整理し、後半は相手から1枚ずつ取りながらさらに手札を減らす。手札を先に0枚にしたら即勝ち。後半終了時は手札の少ない方が勝ち。</div>
+        <div class="kpi">
+          <div class="kcard">
+            <div class="k" id="labelYouScore">プレイヤー1：合計得点</div>
+            <div class="v" id="scoreYou">0</div>
+            <div class="s">今R 三角形：<span id="trisYou">0</span> / 手札：<span id="handYou">0</span></div>
+          </div>
+          <div class="kcard">
+            <div class="k" id="labelCpuScore">プレイヤー2：合計得点</div>
+            <div class="v" id="scoreCpu">0</div>
+            <div class="s">今R 三角形：<span id="trisCpu">0</span> / 手札：<span id="handCpu">0</span></div>
+          </div>
+          <div class="kcard">
+            <div class="k" id="labelYouSum">プレイヤー1：残り札合計</div>
+            <div class="v" id="sumYou">0</div>
+            <div class="s">判定用（JOKER=0, A=1, J=11, Q=12, K=13）</div>
+          </div>
+          <div class="kcard">
+            <div class="k" id="labelCpuSum">プレイヤー2：残り札合計</div>
+            <div class="v" id="sumCpu">0</div>
+            <div class="s">判定用（JOKER=0, A=1, J=11, Q=12, K=13）</div>
+          </div>
+        </div>
+
+        <div class="turnBanner" id="turnBanner">
+          <div class="buildBar" id="buildBar"></div>
+          <div class="turnContent">
+            <div class="big" id="turnBig">開始前</div>
+            <div class="small" id="turnSmall">「ゲーム開始」を押してください。</div>
+            <div class="taskLine" aria-live="polite" aria-atomic="true">
+              <b id="taskTitle">まずはゲーム開始！</b>
+              <span id="taskDetail">前半と後半の流れを見てからスタートできます。</span>
+            </div>
+            <div class="dotsRow" id="turnDots"></div>
+          <div class="roundInline" id="roundInline" hidden aria-live="polite">
+            <b id="roundInlineTitle"></b>
+            <span id="roundInlineDetail"></span>
+            <div class="row">
+              <button class="smallBtn" id="btnReviewRound">結果をもう一度見る</button>
+              <button class="smallBtn primary" id="btnNextRound">次のラウンドへ →</button>
+            </div>
+          </div>
+          </div>
+          <div class="row turnActions">
+            <button class="smallBtn primary" id="btnStartDraw" disabled>後半へ進む →</button>
+            <button class="smallBtn primary" id="btnEndTurn" disabled>③ ターン終了（交代）</button>
+          </div>
+        </div>
+
+        <div class="builder">
+          <div class="buildWorkbench">
+            <div class="handWorkspace">
+              <div class="hint">
+            <span class="handTitle" id="handTitle">あなたの手札：数字を3枚選びます</span><br>
+            <span class="handInstruction" id="handInstruction">① 頂点 → ② 左下 → ③ 右下 →「この三角形を固定する」</span><br>
+            <span class="mono">Aは頂点で14／下段で1。ジョーカーは0で任意のスート／色に対応。前半は3枚すべて別スート＋上段と下段は反対色。</span>
+            <span id="drawFixGuide" hidden>後半は1ターンに<b>最大1組</b>固定できます。引いた札を使う必要はありません。</span>
+          </div>
+
+              <div class="hand" id="handArea"></div>
+            </div>
+
+          <div class="triPreview">
+            <div class="triDrawingZone">
+              <div class="triBoardHead">
+                <b>数字の三角形</b>
+                <span class="badge">頂点 ＝ 左下 ＋ 右下</span>
+              </div>
+              <div id="triDrawing" class="triDrawing" role="img" aria-label="選択中の数字の三角形"></div>
+              <div id="triEquation" class="triEquation waiting">上・左下・右下の順にカードを選択</div>
+            </div>
+            <div class="tri">
+              <div class="top">
+                <span class="badge"><strong>上段</strong></span>
+                <span id="selTopText" class="mono">未選択</span>
+              </div>
+              <div class="bot">
+                <span class="badge"><strong>下段</strong></span>
+                <span id="selBotText" class="mono">未選択</span>
+              </div>
+              <div class="row">
+                <span class="badge" id="triOkBadge">判定：-</span>
+                <span class="badge"><strong>条件</strong> 上段＝下段2枚合計／前半は全スート別＋上下反対色</span>
+              </div>
+            </div>
+            <div class="row triActions">
+              <button class="smallBtn" id="btnClearSel">選択クリア</button>
+              <button class="smallBtn primary" id="btnFix" disabled>この三角形を固定する</button>
+            </div>
+          </div>
+
+          </div><!-- /buildWorkbench -->
+
+          <div class="drawArea" id="drawArea" style="display:none;">
+            <div class="row" style="justify-content:space-between;">
+              <div>
+                <b class="drawTitle" id="drawAreaTitle">① 相手の裏向き札から1枚選ぶ</b>
+                <div class="hint" id="drawAreaDetail">下の裏向きカードから、自分で1枚選んで取ります。</div>
+                <div class="hint">1枚取った後は、引いた札に関係なく、自分の手札から三角形を最大1組固定できます。</div>
+              </div>
+              <button class="smallBtn primary" id="btnDraw" disabled>おまかせで1枚引く</button>
+            </div>
+            <div class="backs" id="backsArea"></div>
+            <div class="hint" id="drawHint"></div>
+          </div>
+
+          <div class="twoCols">
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <b id="triListYouLabel">プレイヤー1の固定三角形</b>
+                <span class="badge">タップで拡大</span>
+              </div>
+              <div class="triList" id="triListYou"></div>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between; margin-bottom:6px;">
+                <b id="triListCpuLabel">プレイヤー2の固定三角形</b>
+                <span class="badge">タップで拡大</span>
+              </div>
+              <div class="triList" id="triListCpu"></div>
+            </div>
+          </div>
+
+          <div class="footerHint" id="footerHint">
+            <b>前半：</b>自分の手札から作れるだけ三角形を固定。ただし<b>3枚はすべて別スート</b>かつ<b>上段と下段2枚は反対色</b>。ジョーカーは不足するスート／色として使えます。3分経過、または「ビルド終了」で終了。未固定分はそのまま残ります。<br>
+            <b>後半：</b>相手の裏向き手札から自分で1枚選んで取る。その後、自分の手札から自由に<b>最大1組</b>固定。交互に各自<b>3ターン</b>で判定。<br>
+            <b>即勝（重要）：</b>いずれかの手札が<b>0枚になった瞬間</b>にそのプレイヤーのラウンド勝利。<br>
+            <b>判定</b>：①残り枚数が少ない方 → ②残り札の数字合計が小さい方 → ③引き分け。<br>
+            <b>得点</b>：勝者＝そのラウンドで自分が作った三角形数／引分＝双方1点／全<span id="seriesTotal2">5</span>ラウンド合計。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" id="logPanel">
+      <div class="hd">
+        <h2>ログ</h2>
+        <div class="row">
+          <button class="smallBtn" id="btnCopyLog">ログコピー</button>
+          <button class="smallBtn" id="btnClearLog">ログ消去</button>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="log" id="log"></div>
+        <div class="hint" style="margin-top:10px;" id="modeMemo"><b>メモ</b>：対人戦では交代時にプライバシー画面を挟み、相手の手札を見ないで端末を渡します。</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+
+<div class="handoffScreen" id="handoffScreen" role="dialog" aria-modal="true">
+  <div class="handoffBox">
+    <div>端末を渡してください</div>
+    <div class="who" id="handoffWho">プレイヤー1の番</div>
+    <div class="why" id="handoffWhy">相手に手札が見えないようにしてから交代してください。</div>
+    <button class="primary" id="btnHandoffReady">準備OK：手札を表示</button>
+  </div>
+</div>
+
+<!-- Rules Modal -->
+<div class="modal" id="rulesModal" role="dialog" aria-modal="true">
+  <div class="box">
+    <div class="mh">
+      <div class="t">くわしい遊び方</div>
+      <button class="smallBtn" id="btnCloseRules">閉じる</button>
+    </div>
+    <div class="mb">
+      <div class="rule">
+        <h3>1．このゲームの目的</h3>
+        <p>カード3枚を使って「数字の三角形」を作り、手札を減らしていく2人用ゲームです。1ラウンドは、最初に手札だけで三角形を作る<b>前半ビルド</b>と、相手の裏向き手札から1枚ずつ取り合う<b>後半3ターン戦</b>の2段階です。</p>
+        <p>各ラウンドの勝敗で得点を獲得し、全<b><span id="seriesTotal3">5</span>ラウンド</b>の合計得点でシリーズ勝者を決めます。</p>
+
+        <h3>2．カードと数字の扱い</h3>
+        <ul>
+          <li>通常の52枚を半分ずつ配り、各プレイヤーは通常札26枚を持ちます。</li>
+          <li>さらに各プレイヤーに<b>ジョーカーを1枚</b>加えるので、開始時の手札は<b>27枚</b>です。</li>
+          <li>2～10は数字どおり、J=11、Q=12、K=13です。</li>
+          <li>Aは通常は<b>1</b>ですが、三角形の<b>上段に置いたAだけ14</b>として扱います。</li>
+          <li>ジョーカーの数値は<b>0</b>です。前半では必要なスート・色として扱えます。</li>
+        </ul>
+
+        <h3>3．数字の三角形の基本</h3>
+        <p>手札から<b>上段1枚 → 左下1枚 → 右下1枚</b>の順に選びます。数字が次の関係になれば三角形です。</p>
+        <div class="ruleImportant"><b>上段の数字 ＝ 左下の数字 ＋ 右下の数字</b></div>
+        <div class="ruleExample">例：上段10、下段4と6 → 10＝4＋6なので成立。<br>例：上段A、下段6と8 → 上段Aは14なので、14＝6＋8で成立。</div>
+        <p>成立した三角形を「固定」すると、その3枚は手札から取り除かれ、固定済み三角形として公開されます。作った三角形の数はそのラウンドの得点にも関係します。</p>
+
+        <h3>4．前半 STEP 1：3分ビルド</h3>
+        <p>前半では、自分の手札だけを使ってできるだけ多くの三角形を作ります。ただし数字が合うだけではなく、次の<b>2つのスート条件を同時に満たす</b>必要があります。</p>
+        <ol>
+          <li><b>3枚のスートをすべて別にする。</b></li>
+          <li><b>上段と下段2枚の色を反対にする。</b></li>
+        </ol>
+        <p>そのため、上段が黒（♠・♣）なら、下段は赤の<b>♥と♦を1枚ずつ</b>。上段が赤（♥・♦）なら、下段は黒の<b>♠と♣を1枚ずつ</b>になります。</p>
+        <div class="ruleExample"><b>成立例：</b> 10♠ ＝ 4♥ ＋ 6♦<br>数字が10＝4＋6、スートは♠・♥・♦の3種類、上段が黒で下段2枚が赤なので成立。<br><br><b>不成立例：</b> 10♠ ＝ 4♥ ＋ 6♥<br>数字は合っていますが、下段のスートが重複しているので不可。<br><br><b>不成立例：</b> 10♠ ＝ 4♣ ＋ 6♦<br>3スートは別ですが、下段4♣が上段10♠と同じ黒なので不可。</div>
+        <p><b>ジョーカーは前半ではワイルドなスート／色</b>として扱えます。ただし数字は必ず0のままです。たとえば 7♠＝7♥＋JOKER(0) なら、ジョーカーを♦として扱えば、数字・スート・色のすべてを満たせます。</p>
+        <p><b>持ち時間は3分。</b>時間切れになっても、残った手札を自動で三角形にする処理はありません。自分で固定できた分だけが前半の成果です。早く終えたい場合は「後半へ進む」または対人戦の「ビルド終了」を押せます。</p>
+
+        <h3>5．CPU対戦の前半</h3>
+        <p>初期設定はCPU対戦です。あなたは3分以内に自分でビルドします。CPUはCPU自身の手札だけを使って自動でビルドしますが、<b>あなたの未固定の手札を自動処理することはありません</b>。CPU強さは「弱・中・強」から選べます。</p>
+
+        <h3>6．対人戦の前半（1台を交代で使用）</h3>
+        <p>「対人（1台を交代）」を選ぶと、プレイヤー1とプレイヤー2が<b>それぞれ3分</b>ずつビルドします。交代時には手札を隠す画面が出ます。</p>
+        <ol>
+          <li>「端末を渡してください」と表示されたら、現在のプレイヤーは画面を相手に渡します。</li>
+          <li>次のプレイヤーが受け取ってから「準備OK：手札を表示」を押します。</li>
+          <li>「準備OK」を押した時点から、その人の3分が始まります。端末を渡している間は持ち時間が減りません。</li>
+        </ol>
+        <p>対戦中は相手に秘密の情報が漏れないよう、残り札の数字合計やログなど一部の情報を隠します。固定済み三角形や手札枚数は公開情報です。</p>
+
+        <h3>7．後半 STEP 2：自由ドロー3ターン戦</h3>
+        <p>前半が終わったら、相手の手札からカードを取り合う後半へ進みます。後半は双方<b>3ターンずつ</b>です。</p>
+        <ol>
+          <li>自分の番になったら、相手の<b>裏向き手札から1枚</b>選んで取ります。ドローは毎ターン必須です。</li>
+          <li>取った後、自分の手札全体から三角形を<b>最大1組</b>作れます。</li>
+          <li>後半では、前半にあった「3スートすべて別」「上下反対色」という制限はありません。<b>数字の式さえ成立すればOK</b>です。</li>
+          <li>引いたカードを三角形に使う必要もありません。以前から持っていた3枚を使っても構いません。</li>
+          <li>三角形を作らない、または作れない場合も「ターン終了」で交代できます。</li>
+        </ol>
+        <div class="ruleImportant"><b>後半の増減：</b>最初に1枚取るので、三角形を作れなければ手札は1枚増えます。1組作れば3枚を固定するため、ドロー分を含めて<b>差し引き2枚減ります</b>。後半で成功するかどうかが勝敗を大きく左右します。</div>
+        <p>対人戦では毎ターン終了後に交代画面を挟みます。CPU戦では、あなたのターンが終わるとCPUが自分のターンを行います。</p>
+
+        <h3>8．ジョーカーの使い方</h3>
+        <p>ジョーカーの数値は常に<b>0</b>です。たとえば 8＝8＋0 のような三角形を作れます。前半ではさらに、成立に必要なスート・色へ変化できます。後半ではスート制限そのものがないため、単純に「0のカード」として使います。</p>
+
+        <h3>9．ラウンドの勝敗</h3>
+        <p>ラウンド中、誰かの手札が<b>0枚になった瞬間</b>、そのプレイヤーの即勝ちです。</p>
+        <p>双方が後半3ターンを終えても手札が残っている場合は、次の順番で判定します。</p>
+        <ol>
+          <li><b>残り手札枚数が少ない方</b>が勝ち。</li>
+          <li>枚数が同じなら、<b>残り札の数字合計が小さい方</b>が勝ち。ジョーカーは0として計算します。</li>
+          <li>数字合計まで同じなら引き分け。</li>
+        </ol>
+        <p>ラウンド終了時には結果画面が開き、勝者、勝敗理由、残り枚数、残り数字合計、作った三角形数、獲得点を確認できます。</p>
+
+        <h3>10．得点とシリーズ勝者</h3>
+        <p>ラウンドの<b>勝者</b>は、そのラウンドで自分が作った三角形の総数だけ得点します。前半と後半の三角形を合わせて数えます。<b>引き分けは双方1点</b>です。</p>
+        <p>全5ラウンドが終わった時点で、合計得点が多い方がシリーズ勝者です。後半の先手はラウンドごとに交代するため、一方だけが毎回先手になることはありません。</p>
+
+        <h3>11．操作の流れだけ確認したい場合</h3>
+        <div class="ruleExample">
+          <b>前半：</b>カードを「上段 → 左下 → 右下」の順に選ぶ → 条件が合えば「この三角形を固定する」 → 3分まで繰り返す。<br><br>
+          <b>後半：</b>相手の「？」カードを1枚選ぶ → 必要なら手札から三角形を1組固定 → 「ターン終了」 → これを双方3ターン。<br><br>
+          <b>終了：</b>手札0枚なら即勝ち。そうでなければ3ターン終了後に残り枚数 → 数字合計の順で判定。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Triangle Preview Modal（固定△のタップ拡大） -->
+<div class="modal" id="triModal" role="dialog" aria-modal="true">
+  <div class="box">
+    <div class="mh">
+      <div class="t" id="triModalTitle">固定三角形プレビュー</div>
+      <button class="smallBtn" id="btnCloseTri">閉じる</button>
+    </div>
+    <div class="mb">
+      <div class="hint" id="triModalDesc">—</div>
+      <div class="triBigRow" id="triBigRow"></div>
+      <div class="hint" style="margin-top:10px;">※頂点の数字はカードの値です。上のAは14、下のAは1になります。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Round Result Modal: 次へ進むまで結果を保持 -->
+<div class="modal" id="roundModal" role="dialog" aria-modal="true" aria-labelledby="roundModalTitle">
+  <div class="box">
+    <div class="mh"><div class="t" id="roundModalTitle">ラウンド結果</div><span class="badge" id="roundModalStep">結果を確認</span></div>
+    <div class="mb">
+      <div class="roundHero" id="roundHero">
+        <div class="resultEyebrow" id="roundResultType">勝敗判定</div>
+        <div class="resultWinner" id="roundWinner">—</div>
+        <div class="resultReason" id="roundReason">—</div>
+      </div>
+      <table class="roundCompare" aria-label="勝敗の判定に使った数字">
+        <thead><tr><th scope="col">比較項目</th><th scope="col" id="roundHeadYou">プレイヤー1</th><th scope="col" id="roundHeadCpu">プレイヤー2</th></tr></thead>
+        <tbody>
+          <tr id="roundCountRow"><th scope="row">残り手札</th><td id="roundYouCount">—</td><td id="roundCpuCount">—</td></tr>
+          <tr id="roundSumRow"><th scope="row">残り数字合計</th><td id="roundYouSum">—</td><td id="roundCpuSum">—</td></tr>
+          <tr><th scope="row">作った三角形</th><td id="roundYouTris">—</td><td id="roundCpuTris">—</td></tr>
+        </tbody>
+      </table>
+      <div class="roundPoint">
+        <div class="roundPointCard"><span class="ptLabel" id="roundPtLabelYou">プレイヤー1の獲得点</span><span class="ptValue" id="roundYouPts">—</span><span class="ptTotal" id="roundYouTotal">累計 — 点</span></div>
+        <div class="roundPointCard cpu"><span class="ptLabel" id="roundPtLabelCpu">プレイヤー2の獲得点</span><span class="ptValue" id="roundCpuPts">—</span><span class="ptTotal" id="roundCpuTotal">累計 — 点</span></div>
+      </div>
+      <div class="roundExplain" id="roundPointExplain">—</div>
+      <div class="roundActions">
+        <button class="ghost" id="btnInspectBoard">盤面の三角形を確認する</button>
+        <button class="primary" id="btnRoundContinue">次のラウンドへ →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Series End Modal（大演出つき） -->
+<div class="modal" id="seriesModal" role="dialog" aria-modal="true">
+  <div class="box">
+    <div class="mh">
+      <div class="t">シリーズ結果</div>
+      <button class="smallBtn" id="btnCloseSeries">閉じる</button>
+    </div>
+    <div class="mb">
+      <div class="seriesHero">
+        <div class="winner" id="seriesWinnerText">—</div>
+        <div class="scoreLine" id="seriesScoreLine">—</div>
+        <div class="note" id="seriesNote">—</div>
+        <div class="actions">
+          <button class="primary" id="btnNewSeries">もう一度遊ぶ</button>
+          <button class="ghost" id="btnCloseSeries2">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CONFIG = {
+    BUILD_TIME: 180,
+    DRAW_TURNS: 3,
+    INSTANT_WIN_CARDS: 0,
+    SERIES_ROUNDS: 5,
+    CPU_TURN_DELAY_MS: 520,
+
+    // CPUビルド開始遅延：3〜5秒ランダム（ログは「数秒後」に簡略化）
+    CPU_BUILD_START_DELAY_MIN_MS: 3000,
+    CPU_BUILD_START_DELAY_MAX_MS: 5000,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const suits = ["♠","♥","♦","♣"];
+  const isRedSuit = (s) => (s==="♥" || s==="♦");
+  const isJoker = (c) => !!c && c.rank===0;
+
+  const rankLabel = (r)=>{
+    if(r===1) return "A";
+    if(r===11) return "J";
+    if(r===12) return "Q";
+    if(r===13) return "K";
+    return String(r);
+  };
+  const cardText = (c)=> isJoker(c) ? "JOKER(0)" : `${rankLabel(c.rank)}${c.suit}`;
+
+  function shuffle(arr){
+    for(let i=arr.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+  }
+  function fmtTime(sec){
+    sec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(sec/60);
+    const s = sec%60;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  const el = {
+    gameMode: $("gameMode"),
+    mainGrid: $("mainGrid"),
+    logPanel: $("logPanel"),
+    cpuLevelPill: $("cpuLevelPill"),
+    fxCpuPill: $("fxCpuPill"),
+    firstPlayerLabel: $("firstPlayerLabel"),
+    stepBuildDesc: $("stepBuildDesc"),
+    stepDrawDesc: $("stepDrawDesc"),
+    roadmapGoal: $("roadmapGoal"),
+    labelYouScore: $("labelYouScore"),
+    labelCpuScore: $("labelCpuScore"),
+    labelYouSum: $("labelYouSum"),
+    labelCpuSum: $("labelCpuSum"),
+    triListYouLabel: $("triListYouLabel"),
+    triListCpuLabel: $("triListCpuLabel"),
+    footerHint: $("footerHint"),
+    modeMemo: $("modeMemo"),
+    handoffScreen: $("handoffScreen"),
+    handoffWho: $("handoffWho"),
+    handoffWhy: $("handoffWhy"),
+    btnHandoffReady: $("btnHandoffReady"),
+    roundNo: $("roundNo"),
+    seriesTotal: $("seriesTotal"),
+    seriesTotal2: $("seriesTotal2"),
+    seriesTotal3: $("seriesTotal3"),
+    phaseText: $("phaseText"),
+    timeBadge: $("timeBadge"),
+    stepBuild: $("stepBuild"),
+    stepDraw: $("stepDraw"),
+    stepBuildState: $("stepBuildState"),
+    stepDrawState: $("stepDrawState"),
+    taskTitle: $("taskTitle"),
+    taskDetail: $("taskDetail"),
+    handTitle: $("handTitle"),
+    handInstruction: $("handInstruction"),
+    drawFixGuide: $("drawFixGuide"),
+    drawAreaTitle: $("drawAreaTitle"),
+    drawAreaDetail: $("drawAreaDetail"),
+    builder: document.querySelector(".builder"),
+    firstPlayerText: $("firstPlayerText"),
+    buildTimeText: $("buildTimeText"),
+    scoreYou: $("scoreYou"),
+    scoreCpu: $("scoreCpu"),
+    trisYou: $("trisYou"),
+    trisCpu: $("trisCpu"),
+    handYou: $("handYou"),
+    handCpu: $("handCpu"),
+    sumYou: $("sumYou"),
+    sumCpu: $("sumCpu"),
+    turnBanner: $("turnBanner"),
+    buildBar: $("buildBar"),
+    turnBig: $("turnBig"),
+    turnSmall: $("turnSmall"),
+    turnDots: $("turnDots"),
+    handArea: $("handArea"),
+    selTopText: $("selTopText"),
+    selBotText: $("selBotText"),
+    triOkBadge: $("triOkBadge"),
+    triDrawing: $("triDrawing"),
+    triEquation: $("triEquation"),
+    btnFix: $("btnFix"),
+    btnClearSel: $("btnClearSel"),
+    btnStart: $("btnStart"),
+    btnNew: $("btnNew"),
+    btnStartDraw: $("btnStartDraw"),
+    btnEndTurn: $("btnEndTurn"),
+    btnDraw: $("btnDraw"),
+    drawArea: $("drawArea"),
+    backsArea: $("backsArea"),
+    drawHint: $("drawHint"),
+    triListYou: $("triListYou"),
+    triListCpu: $("triListCpu"),
+    log: $("log"),
+    btnCopyLog: $("btnCopyLog"),
+    btnClearLog: $("btnClearLog"),
+    cpuLevel: $("cpuLevel"),
+    drawFixMax: $("drawFixMax"),
+    handSort: $("handSort"),
+    endAlertOn: $("endAlertOn"),
+    fxInstantOn: $("fxInstantOn"),
+    fxCpuOn: $("fxCpuOn"),
+    btnRules: $("btnRules"),
+    rulesModal: $("rulesModal"),
+    btnCloseRules: $("btnCloseRules"),
+    fixMaxText: $("fixMaxText"),
+    fixMaxText2: $("fixMaxText2"),
+    ruleFixMax: $("ruleFixMax"),
+
+    triModal: $("triModal"),
+    triModalTitle: $("triModalTitle"),
+    triModalDesc: $("triModalDesc"),
+    triBigRow: $("triBigRow"),
+    btnCloseTri: $("btnCloseTri"),
+
+    roundInline: $("roundInline"),
+    roundInlineTitle: $("roundInlineTitle"),
+    roundInlineDetail: $("roundInlineDetail"),
+    btnReviewRound: $("btnReviewRound"),
+    btnNextRound: $("btnNextRound"),
+    roundModal: $("roundModal"),
+    roundModalTitle: $("roundModalTitle"),
+    roundModalStep: $("roundModalStep"),
+    roundHero: $("roundHero"),
+    roundResultType: $("roundResultType"),
+    roundWinner: $("roundWinner"),
+    roundReason: $("roundReason"),
+    roundCountRow: $("roundCountRow"),
+    roundSumRow: $("roundSumRow"),
+    roundHeadYou: $("roundHeadYou"),
+    roundHeadCpu: $("roundHeadCpu"),
+    roundPtLabelYou: $("roundPtLabelYou"),
+    roundPtLabelCpu: $("roundPtLabelCpu"),
+    roundYouCount: $("roundYouCount"),
+    roundCpuCount: $("roundCpuCount"),
+    roundYouSum: $("roundYouSum"),
+    roundCpuSum: $("roundCpuSum"),
+    roundYouTris: $("roundYouTris"),
+    roundCpuTris: $("roundCpuTris"),
+    roundYouPts: $("roundYouPts"),
+    roundCpuPts: $("roundCpuPts"),
+    roundYouTotal: $("roundYouTotal"),
+    roundCpuTotal: $("roundCpuTotal"),
+    roundPointExplain: $("roundPointExplain"),
+    btnInspectBoard: $("btnInspectBoard"),
+    btnRoundContinue: $("btnRoundContinue"),
+
+    seriesModal: $("seriesModal"),
+    btnCloseSeries: $("btnCloseSeries"),
+    btnCloseSeries2: $("btnCloseSeries2"),
+    btnNewSeries: $("btnNewSeries"),
+    seriesWinnerText: $("seriesWinnerText"),
+    seriesScoreLine: $("seriesScoreLine"),
+    seriesNote: $("seriesNote"),
+
+    flash: $("flash"),
+  };
+
+  // ===== Log =====
+  const logBuffer = [];
+  function isNearBottom(node, gap=40){
+    return node.scrollHeight - node.scrollTop - node.clientHeight < gap;
+  }
+  function appendLog(line){
+    const t = new Date();
+    const hh = String(t.getHours()).padStart(2,"0");
+    const mm = String(t.getMinutes()).padStart(2,"0");
+    const ss = String(t.getSeconds()).padStart(2,"0");
+    const full = `[${hh}:${mm}:${ss}] ${line}`;
+    logBuffer.push(full);
+
+    const keep = isNearBottom(el.log);
+    const div = document.createElement("div");
+    div.className = "logLine" + (line.startsWith("★") || line.includes("=== ") ? " logStar" : "");
+    div.textContent = full;
+    el.log.appendChild(div);
+
+    requestAnimationFrame(()=>{
+      if(keep) el.log.scrollTop = el.log.scrollHeight;
+    });
+  }
+  function clearLog(){
+    logBuffer.length = 0;
+    el.log.innerHTML = "";
+  }
+
+  // ===== FX (confetti) =====
+  const fx = $("fxCanvas");
+  const ctx = fx.getContext("2d");
+  let confetti = [];
+  let fxAnim = 0;
+  function resizeFx(){
+    fx.width = window.innerWidth * devicePixelRatio;
+    fx.height = window.innerHeight * devicePixelRatio;
+    fx.style.width = window.innerWidth+"px";
+    fx.style.height = window.innerHeight+"px";
+  }
+  window.addEventListener("resize", resizeFx);
+  resizeFx();
+
+  function randColor(){
+    const h = Math.floor(Math.random()*360);
+    const s = 85 + Math.random()*10;
+    const l = 55 + Math.random()*10;
+    return `hsl(${h} ${s}% ${l}%)`;
+  }
+  function launchConfetti(strength=1){
+    const W = fx.width, H = fx.height;
+    const N = Math.floor(260 * strength);
+    const add = [];
+    for(let i=0;i<N;i++){
+      add.push({
+        x: Math.random()*W,
+        y: -Math.random()*H*0.2,
+        vx: (Math.random()-0.5)*2.6*devicePixelRatio*strength,
+        vy: (2.6 + Math.random()*4.6)*devicePixelRatio*strength,
+        a: Math.random()*Math.PI*2,
+        va: (Math.random()-0.5)*0.38,
+        life: 210 + Math.random()*140,
+        c: randColor(),
+        w: (6 + Math.random()*10)*devicePixelRatio,
+        h: (2.5 + Math.random()*6)*devicePixelRatio,
+      });
+    }
+    confetti = confetti.concat(add);
+    if(!fxAnim) animateFx();
+  }
+  function animateFx(){
+    fxAnim = requestAnimationFrame(animateFx);
+    ctx.clearRect(0,0,fx.width, fx.height);
+    for(const p of confetti){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.a += p.va;
+      p.vy += 0.03*devicePixelRatio;
+      p.life -= 1;
+      if(p.x < -80) p.x = fx.width+80;
+      if(p.x > fx.width+80) p.x = -80;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.a);
+      ctx.fillStyle = p.c;
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    }
+    confetti = confetti.filter(p => p.life>0 && p.y < fx.height+160*devicePixelRatio);
+    if(confetti.length===0){
+      cancelAnimationFrame(fxAnim);
+      fxAnim = 0;
+      ctx.clearRect(0,0,fx.width, fx.height);
+    }
+  }
+
+  function playWinSound(){
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      const ac = new AC();
+      const now = ac.currentTime;
+      const master = ac.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.20, now+0.03);
+      master.gain.exponentialRampToValueAtTime(0.0001, now+0.95);
+      master.connect(ac.destination);
+
+      const o = ac.createOscillator();
+      o.type="triangle";
+      o.frequency.setValueAtTime(440, now);
+      o.frequency.exponentialRampToValueAtTime(660, now+0.25);
+      o.frequency.exponentialRampToValueAtTime(523.25, now+0.7);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0, now);
+      g.gain.linearRampToValueAtTime(0.35, now+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+0.95);
+      o.connect(g); g.connect(master);
+      o.start(now); o.stop(now+1.02);
+      setTimeout(()=>ac.close?.().catch(()=>{}), 1400);
+    }catch(e){}
+  }
+
+  function playSeriesWinSound(){
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      const ac = new AC();
+      const now = ac.currentTime;
+
+      const master = ac.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.22, now+0.03);
+      master.gain.exponentialRampToValueAtTime(0.0001, now+1.6);
+      master.connect(ac.destination);
+
+      const o = ac.createOscillator();
+      o.type="triangle";
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0, now);
+      g.gain.linearRampToValueAtTime(0.35, now+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+1.6);
+
+      o.frequency.setValueAtTime(392, now);
+      o.frequency.exponentialRampToValueAtTime(523.25, now+0.35);
+      o.frequency.exponentialRampToValueAtTime(659.25, now+0.8);
+      o.frequency.exponentialRampToValueAtTime(523.25, now+1.25);
+
+      o.connect(g); g.connect(master);
+      o.start(now); o.stop(now+1.7);
+      setTimeout(()=>ac.close?.().catch(()=>{}), 2100);
+    }catch(e){}
+  }
+
+  // ビープ：少し柔らかい 660Hz / 低め音量
+  function beep(){
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      const ac = new AC();
+      const t = ac.currentTime;
+
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(660, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.12);
+
+      o.connect(g); g.connect(ac.destination);
+      o.start(t); o.stop(t+0.14);
+      setTimeout(()=>ac.close?.().catch(()=>{}), 300);
+    }catch(e){}
+  }
+
+  function flashOnce(){
+    el.flash.classList.remove("go");
+    void el.flash.offsetWidth;
+    el.flash.classList.add("go");
+  }
+
+  function seriesFinaleFx(winner){
+    flashOnce();
+    launchConfetti(1.15);
+    setTimeout(()=>{ flashOnce(); launchConfetti(1.00); }, 520);
+    setTimeout(()=>{ launchConfetti(0.85); }, 980);
+    if(winner==="draw"){
+      playWinSound();
+    }else{
+      playSeriesWinSound();
+    }
+  }
+
+  // ===== Game =====
+  const PHASE = { IDLE:"IDLE", BUILD:"BUILD", DRAW:"DRAW", ROUND_END:"ROUND_END", SERIES_END:"SERIES_END" };
+  const TURN  = { NEED_DRAW:"NEED_DRAW", MAY_FIX:"MAY_FIX" };
+  const sleep = (ms)=> new Promise(r=>setTimeout(r, ms));
+
+  class GameState{
+    constructor(cfg){
+      this.cfg = cfg;
+      this.buildTimer = null;
+      this.cpuBuildDelayTimer = null;
+      this.cpuTurnToken = 0;
+      this.buildToken = 0;
+      this.resetAll();
+    }
+    resetAll(){
+      this.started = false;
+      this.phase = PHASE.IDLE;
+      this.mode = el.gameMode?.value || "cpu";
+      this.privacyLocked = false;
+      this.handoffPlayer = "you";
+      this.handoffReason = "";
+      this.buildDone = { you:false, cpu:false };
+
+      this.round = 0;
+      this.lastRoundResult = null;
+      this.mode = el.gameMode?.value || "cpu";
+      this.seriesScore = { you:0, cpu:0 };
+      this.firstPlayer = "you";
+      this.current = "you";
+
+      this.buildRemain = this.cfg.BUILD_TIME;
+
+      this.hands = { you:[], cpu:[] };
+      this.roundTris = { you:[], cpu:[] };
+
+      this.selected = { topId:null, botIds:[] };
+
+      this.turnStatus = { you: TURN.NEED_DRAW, cpu: TURN.NEED_DRAW };
+      this.drawTurns = { you:0, cpu:0 };
+      this.turnFixRemain = { you:0, cpu:0 };
+      this.drawBackIds = [];
+
+      this.builtThisBuild = { you:false, cpu:false };
+      this.buildDone = { you:false, cpu:false };
+      this.stopTimers();
+    }
+    stopTimers(){
+      if(this.buildTimer){ clearInterval(this.buildTimer); this.buildTimer=null; }
+      if(this.cpuBuildDelayTimer){ clearTimeout(this.cpuBuildDelayTimer); this.cpuBuildDelayTimer=null; }
+      this.cpuTurnToken++;
+      this.buildToken++;
+    }
+    cancelCpuAutoBuildDelay(){
+      this.buildToken++;
+      if(this.cpuBuildDelayTimer){
+        clearTimeout(this.cpuBuildDelayTimer);
+        this.cpuBuildDelayTimer=null;
+      }
+    }
+
+    isPvp(){ return this.mode==="pvp"; }
+    playerName(p){ return this.isPvp() ? (p==="you"?"プレイヤー1":"プレイヤー2") : (p==="you"?"あなた":"CPU"); }
+    other(p){ return p==="you" ? "cpu" : "you"; }
+    activeHuman(){ return this.isPvp() ? this.current : "you"; }
+    pauseBuildTimer(){ if(this.buildTimer){ clearInterval(this.buildTimer); this.buildTimer=null; } }
+    promptHandoff(player, reason){
+      if(!this.isPvp()) return;
+      this.pauseBuildTimer();
+      this.privacyLocked=true;
+      this.handoffPlayer=player;
+      this.handoffReason=reason||"交代";
+      el.handoffWho.textContent=`${this.playerName(player)}の番`;
+      el.handoffWhy.textContent=`${this.handoffReason}。相手に手札が見えないように端末を渡し、準備ができたら手札を表示してください。`;
+      el.handoffScreen.classList.add("show");
+    }
+    resumeHandoff(){
+      if(!this.isPvp()) return;
+      this.privacyLocked=false;
+      el.handoffScreen.classList.remove("show");
+      if(this.phase===PHASE.BUILD) this.startBuildTimer();
+      render();
+    }
+
+    makeDeck(){
+      const deck = [];
+      let id = 0;
+      for(const s of suits){
+        for(let r=1;r<=13;r++) deck.push({id:++id, rank:r, suit:s});
+      }
+      return deck;
+    }
+    sortHand(player){
+      const mode = ((player==="you" || this.isPvp()) ? (el.handSort?.value || "rank") : "rank");
+      const suitOrd = (s)=>{
+        if(s==="♠") return 0;
+        if(s==="♥") return 1;
+        if(s==="♦") return 2;
+        return 3;
+      };
+      const byRankAsc = (a,b)=> (a.rank-b.rank) || (suitOrd(a.suit)-suitOrd(b.suit));
+      const byValueDesc = (a,b)=> (b.rank-a.rank) || (suitOrd(a.suit)-suitOrd(b.suit));
+      const byTopValueDesc = (a,b)=> (this.cardValueTop(b)-this.cardValueTop(a)) || (suitOrd(a.suit)-suitOrd(b.suit));
+      const cmp = mode==="valueDesc" ? byValueDesc : mode==="topValue" ? byTopValueDesc : byRankAsc;
+      this.hands[player].sort(cmp);
+    }
+    dealNewRound(){
+      const deck = shuffle(this.makeDeck());
+      // 通常札26枚ずつに、ジョーカー（値0）を必ず1枚ずつ追加する。
+      this.hands.you = deck.slice(0,26);
+      this.hands.cpu = deck.slice(26,52);
+      this.hands.you.push({id:53, rank:0, suit:"🃏", joker:true});
+      this.hands.cpu.push({id:54, rank:0, suit:"🃏", joker:true});
+      this.sortHand("you");
+      this.sortHand("cpu");
+
+      this.roundTris.you = [];
+      this.roundTris.cpu = [];
+      this.selected = { topId:null, botIds:[] };
+      this.turnStatus = { you: TURN.NEED_DRAW, cpu: TURN.NEED_DRAW };
+      this.drawTurns = { you:0, cpu:0 };
+      this.turnFixRemain = { you:0, cpu:0 };
+      this.drawBackIds = [];
+      this.builtThisBuild = { you:false, cpu:false };
+      this.buildDone = { you:false, cpu:false };
+    }
+
+    cardValueBase(c){ return c.rank; }
+    cardValueTop(c){ return c.rank===1 ? 14 : c.rank; }
+
+    remainingSum(player){
+      return this.hands[player].reduce((a,c)=>a+this.cardValueBase(c),0);
+    }
+    getCardById(player, id){
+      return this.hands[player].find(c => c.id === id) || null;
+    }
+    removeFromHand(player, ids){
+      const set = new Set(ids);
+      this.hands[player] = this.hands[player].filter(c => !set.has(c.id));
+    }
+    pushTriangle(player, top, b1, b2){
+      this.roundTris[player].push({ top, bot1:b1, bot2:b2 });
+      this.roundTris[player].sort((a,b)=> this.cardValueTop(b.top)-this.cardValueTop(a.top));
+    }
+    isTriangle(top,b1,b2){
+      if(!top||!b1||!b2) return false;
+      const mathOk = this.cardValueTop(top) === (this.cardValueBase(b1) + this.cardValueBase(b2));
+      if(!mathOk) return false;
+      // 前半だけ「3枚すべて別スート」かつ「上段と下段2枚は反対色」。
+      // ジョーカーは任意のスート／色になれるため、割り当て可能な組合せが1つでもあれば有効。
+      if(this.phase===PHASE.BUILD){
+        const cards=[top,b1,b2];
+        const choices=cards.map(c=>isJoker(c) ? suits : [c.suit]);
+        let suitRuleOk=false;
+        for(const st of choices[0]){
+          for(const s1 of choices[1]){
+            for(const s2 of choices[2]){
+              if(new Set([st,s1,s2]).size!==3) continue;
+              const topRed=isRedSuit(st);
+              if(isRedSuit(s1)===topRed || isRedSuit(s2)===topRed) continue;
+              suitRuleOk=true;
+              break;
+            }
+            if(suitRuleOk) break;
+          }
+          if(suitRuleOk) break;
+        }
+        if(!suitRuleOk) return false;
+      }
+      return true;
+    }
+    checkInstantWin(){
+      if(this.hands.you.length === this.cfg.INSTANT_WIN_CARDS) return "you";
+      if(this.hands.cpu.length === this.cfg.INSTANT_WIN_CARDS) return "cpu";
+      return null;
+    }
+    fixTriangle(player, top, b1, b2){
+      if(!this.isTriangle(top,b1,b2)) return { ok:false, reason:"not_triangle" };
+      this.removeFromHand(player, [top.id,b1.id,b2.id]);
+      this.pushTriangle(player, top, b1, b2);
+      this.sortHand(player);
+      const iw = this.checkInstantWin();
+      return { ok:true, instantWinner: iw };
+    }
+
+    clearSelection(){ this.selected.topId=null; this.selected.botIds=[]; }
+
+    startSeries(){
+      this.stopTimers();
+      this.mode = el.gameMode?.value || "cpu";
+      this.seriesScore = { you:0, cpu:0 };
+      this.round = 0;
+      this.lastRoundResult = null;
+      el.roundModal.classList.remove("show");
+      this.firstPlayer = (Math.random()<0.5) ? "you" : "cpu";
+      this.started = true;
+      appendLog(`=== シリーズ開始（全${this.cfg.SERIES_ROUNDS}ラウンド） ===`);
+      this.nextRound();
+    }
+
+    finishSeries(){
+      this.phase = PHASE.SERIES_END;
+      appendLog("=== シリーズ終了 ===");
+      appendLog(`最終得点：${this.playerName("you")} ${this.seriesScore.you} / ${this.playerName("cpu")} ${this.seriesScore.cpu}`);
+
+      let seriesWinner = null;
+      if(this.seriesScore.you > this.seriesScore.cpu){ seriesWinner = "you"; appendLog(`★シリーズ勝者：${this.playerName("you")}`); }
+      else if(this.seriesScore.cpu > this.seriesScore.you){ seriesWinner = "cpu"; appendLog(`★シリーズ勝者：${this.playerName("cpu")}`); }
+      else { seriesWinner = "draw"; appendLog("★シリーズ結果：引き分け"); }
+
+      const allowCpuFx = el.fxCpuOn.checked;
+      if(this.isPvp() || seriesWinner==="you" || seriesWinner==="draw" || allowCpuFx){
+        seriesFinaleFx(seriesWinner);
+      }
+
+      showSeriesModal(seriesWinner);
+      render();
+    }
+
+    nextRound(){
+      if(this.round >= this.cfg.SERIES_ROUNDS){
+        this.finishSeries();
+        return;
+      }
+
+      this.lastRoundResult = null;
+      this.round += 1;
+      this.dealNewRound();
+      this.phase = PHASE.BUILD;
+      this.buildRemain = this.cfg.BUILD_TIME;
+      this.current = this.isPvp() ? this.firstPlayer : "you";
+      this.buildDone = {you:false,cpu:false};
+
+      appendLog(`--- ラウンド${this.round} 開始（後半先手：${this.playerName(this.firstPlayer)}） ---`);
+      render();
+      if(this.isPvp()){
+        this.promptHandoff(this.current, "前半ビルド開始（持ち時間3分）");
+      }else{
+        this.startBuildTimer();
+        this.scheduleCpuAutoBuildAtBuildStart();
+      }
+    }
+
+    scheduleCpuAutoBuildAtBuildStart(){
+      if(this.phase !== PHASE.BUILD || this.isPvp()) return;
+      this.cancelCpuAutoBuildDelay();
+
+      const myToken = ++this.buildToken;
+      const min = this.cfg.CPU_BUILD_START_DELAY_MIN_MS;
+      const max = this.cfg.CPU_BUILD_START_DELAY_MAX_MS;
+      const delay = Math.floor(min + Math.random()*(max-min+1));
+
+      this.cpuBuildDelayTimer = setTimeout(()=>{
+        if(this.phase !== PHASE.BUILD) return;
+        if(myToken !== this.buildToken) return;
+        if(this.builtThisBuild.cpu) return;
+
+        const n = this.autoBuildAll("cpu");
+        this.builtThisBuild.cpu = true;
+
+        // ログは「開始数秒後」に簡略化（毎回同じ秒に見えにくくする）
+        appendLog(`CPU 自動ビルド（開始数秒後）：${n}組`);
+        render();
+      }, delay);
+    }
+
+    startBuildTimer(){
+      if(this.buildTimer) clearInterval(this.buildTimer);
+      this.buildTimer = setInterval(()=>{
+        if(this.phase!==PHASE.BUILD) return;
+        this.buildRemain -= 1;
+
+        if(el.endAlertOn?.checked && this.buildRemain>0 && this.buildRemain<=10){
+          beep();
+        }
+        if(this.buildRemain <= 0){
+          this.buildRemain = 0;
+          if(this.isPvp()) this.finishPvpBuildTurn("3分終了");
+          else this.startDrawPhase("3分終了（未固定分はそのまま）");
+          return;
+        }
+        render();
+      }, 1000);
+    }
+
+    finishPvpBuildTurn(why){
+      if(!this.isPvp() || this.phase!==PHASE.BUILD) return;
+      const p=this.current;
+      this.pauseBuildTimer();
+      this.buildDone[p]=true;
+      this.clearSelection();
+      appendLog(`${this.playerName(p)} 前半ビルド終了（${why}）：固定${this.roundTris[p].length}組／残り${this.hands[p].length}枚`);
+      const o=this.other(p);
+      if(!this.buildDone[o]){
+        this.current=o;
+        this.buildRemain=this.cfg.BUILD_TIME;
+        render();
+        this.promptHandoff(o, "前半ビルド交代（持ち時間3分）");
+      }else{
+        this.startDrawPhase("双方の3分ビルド終了");
+      }
+    }
+
+    startDrawPhase(why){
+      if(this.phase!==PHASE.BUILD) return;
+      this.cancelCpuAutoBuildDelay();
+      this.stopTimers();
+
+      this.phase = PHASE.DRAW;
+      this.current = this.firstPlayer;
+      this.turnStatus = { you: TURN.NEED_DRAW, cpu: TURN.NEED_DRAW };
+      this.drawTurns = { you:0, cpu:0 };
+      this.turnFixRemain = { you:0, cpu:0 };
+      this.drawBackIds = [];
+      appendLog(`前半終了 → 後半「自分で1枚引く」開始（${why}）／先手：${this.playerName(this.current)}`);
+
+      this.clearSelection();
+      render();
+      if(this.isPvp()) this.promptHandoff(this.current, "後半3ターン戦を開始");
+      else if(this.current==="cpu") this.cpuTurnFlow();
+    }
+
+    buildPairIndex(hand){
+      const idx = new Map();
+      for(let i=0;i<hand.length;i++){
+        for(let j=i+1;j<hand.length;j++){
+          const a = hand[i], b = hand[j];
+          const sum = this.cardValueBase(a)+this.cardValueBase(b);
+          if(!idx.has(sum)) idx.set(sum, []);
+          idx.get(sum).push([a,b]);
+        }
+      }
+      return idx;
+    }
+    enumerateTriangles(hand){
+      const idx = this.buildPairIndex(hand);
+      const out = [];
+      for(const top of hand){
+        const need = this.cardValueTop(top);
+        const pairs = idx.get(need);
+        if(!pairs) continue;
+        for(const [b1,b2] of pairs){
+          if(top.id===b1.id || top.id===b2.id || b1.id===b2.id) continue;
+          if(!this.isTriangle(top,b1,b2)) continue;
+          out.push({top,b1,b2});
+        }
+      }
+      return out;
+    }
+
+    trianglesContaining(hand, cardId){
+      if(cardId==null) return [];
+      return this.enumerateTriangles(hand).filter(t => t.top.id===cardId || t.b1.id===cardId || t.b2.id===cardId);
+    }
+
+    // CPUは相手の非公開手札を見ない。自分の手札で使い道が少ない札を優先して渡す。
+    chooseGiftCard(giver, level){
+      const own=this.hands[giver];
+      if(!own.length) return null;
+      if(level<=0) return own[Math.floor(Math.random()*own.length)];
+      let best=[], bestScore=Infinity;
+      for(const card of own){
+        const ownOptions=this.trianglesContaining(own,card.id).length;
+        let score=ownOptions*100;
+        if(level>=2) score += (14-this.cardValueBase(card))*0.25;
+        if(score<bestScore){ bestScore=score; best=[card]; }
+        else if(score===bestScore) best.push(card);
+      }
+      return best[Math.floor(Math.random()*best.length)] || own[0];
+    }
+
+    chooseRequiredTriangle(player, cardId, level){
+      const cands=this.trianglesContaining(this.hands[player],cardId);
+      if(!cands.length) return null;
+      if(level<=0) return cands[Math.floor(Math.random()*cands.length)];
+      const ctx={myHand:this.hands[player],myHandLen:this.hands[player].length,lookahead:level>=2,handAfterCache:new Map()};
+      cands.sort((a,b)=>this.scoreTriangle(player,b,ctx)-this.scoreTriangle(player,a,ctx));
+      return cands[0];
+    }
+
+    moveCard(giver, receiver, id){
+      const idx=this.hands[giver].findIndex(c=>c.id===id);
+      if(idx<0) return null;
+      const card=this.hands[giver].splice(idx,1)[0];
+      this.hands[receiver].push(card);
+      this.sortHand(giver); this.sortHand(receiver);
+      return card;
+    }
+
+    scoreTriangle(player, cand, ctx){
+      const { top, b1, b2 } = cand;
+      const topV = this.cardValueTop(top);
+      const botS = this.cardValueBase(b1)+this.cardValueBase(b2);
+
+      let score = topV*10 - botS*2;
+      const myAfter = ctx.myHandLen - 3;
+      score += (27 - myAfter) * 1.2;
+      if(myAfter === this.cfg.INSTANT_WIN_CARDS) score += 2000;
+
+      if(ctx.lookahead){
+        const tmp = ctx.handAfterCache;
+        const tKey = top.id+"-"+b1.id+"-"+b2.id;
+        if(!tmp.has(tKey)){
+          const after = ctx.myHand.filter(c=> (c.id!==top.id && c.id!==b1.id && c.id!==b2.id));
+          tmp.set(tKey, after);
+        }
+        const afterHand = tmp.get(tKey);
+        const nextCount = this.enumerateTriangles(afterHand).length;
+        score += Math.min(12, nextCount) * 6.0;
+      }
+      return score;
+    }
+
+    chooseBestTriangles(hand, maxCount, level, player){
+      const cands = this.enumerateTriangles(hand);
+      if(cands.length===0) return [];
+
+      if(level<=0){
+        const win = cands.find(c => (hand.length - 3)===this.cfg.INSTANT_WIN_CARDS);
+        if(win) return [win];
+        shuffle(cands);
+        return cands.slice(0, maxCount);
+      }
+
+      const ctx = {
+        myHand: hand,
+        myHandLen: hand.length,
+        lookahead: (level>=2),
+        handAfterCache: new Map(),
+      };
+
+      cands.sort((a,b)=>{
+        if(level===1){
+          const sa = this.cardValueTop(a.top)*10 - (this.cardValueBase(a.b1)+this.cardValueBase(a.b2))*2;
+          const sb = this.cardValueTop(b.top)*10 - (this.cardValueBase(b.b1)+this.cardValueBase(b.b2))*2;
+          return sb - sa;
+        }else{
+          return this.scoreTriangle(player, b, ctx) - this.scoreTriangle(player, a, ctx);
+        }
+      });
+
+      const picked = [];
+      const used = new Set();
+      for(const c of cands){
+        if(used.has(c.top.id) || used.has(c.b1.id) || used.has(c.b2.id)) continue;
+        picked.push(c);
+        used.add(c.top.id); used.add(c.b1.id); used.add(c.b2.id);
+        if(picked.length>=maxCount) break;
+      }
+      return picked;
+    }
+
+    autoBuildAll(player){
+      let made = 0;
+      const level = parseInt(el.cpuLevel.value,10);
+      while(true){
+        const maxOne = this.chooseBestTriangles(this.hands[player], 1, (player==="cpu"?level:2), player)[0];
+        if(!maxOne) break;
+
+        const {top,b1,b2} = maxOne;
+        const res = this.fixTriangle(player, top,b1,b2);
+        if(!res.ok) break;
+
+        made++;
+        appendLog(`${player==="you"?"あなた":"CPU"} 自動ビルド：${cardText(top)} = ${cardText(b1)} + ${cardText(b2)}`);
+
+        if(res.instantWinner){
+          this.finishRoundByInstant(res.instantWinner, "ビルド中の即勝");
+          return made;
+        }
+      }
+      return made;
+    }
+
+    autoBuildBoth(reason=""){
+      if(this.phase!==PHASE.BUILD) return;
+      this.cancelCpuAutoBuildDelay();
+      if(this.builtThisBuild.you && this.builtThisBuild.cpu) return;
+
+      if(!this.builtThisBuild.you){
+        const n = this.autoBuildAll("you");
+        this.builtThisBuild.you = true;
+        appendLog(`あなた 自動ビルド完了：${n}組${reason?`（${reason}）`:""}`);
+      }
+      if(!this.builtThisBuild.cpu){
+        const n = this.autoBuildAll("cpu");
+        this.builtThisBuild.cpu = true;
+        appendLog(`CPU 自動ビルド完了：${n}組${reason?`（${reason}）`:""}`);
+      }
+      render();
+    }
+
+    canHumanSelectAndFix(){
+      if(this.privacyLocked) return false;
+      const p=this.activeHuman();
+      if(this.phase===PHASE.BUILD) return this.isPvp() ? !this.buildDone[p] : true;
+      if(this.phase===PHASE.DRAW){
+        if(this.isPvp()) return this.turnStatus[p]===TURN.MAY_FIX && this.turnFixRemain[p]>0;
+        return (this.current==="you" && this.turnStatus.you===TURN.MAY_FIX && this.turnFixRemain.you>0);
+      }
+      return false;
+    }
+
+    onClickCard(id){
+      if(!this.canHumanSelectAndFix()) return;
+      const topId = this.selected.topId;
+      const botIds = this.selected.botIds.slice();
+
+      if(topId===null){
+        this.selected.topId = id;
+      }else if(topId===id){
+        this.clearSelection();
+      }else{
+        const idx = botIds.indexOf(id);
+        if(idx>=0){
+          botIds.splice(idx,1);
+          this.selected.botIds = botIds;
+        }else{
+          if(botIds.length<2){
+            botIds.push(id);
+            this.selected.botIds = botIds;
+          }else{
+            botIds.shift();
+            botIds.push(id);
+            this.selected.botIds = botIds;
+          }
+        }
+      }
+      render();
+    }
+
+    fixSelectedTriangle(){
+      if(!this.canHumanSelectAndFix()) return;
+      const p=this.activeHuman();
+      const top = this.getCardById(p, this.selected.topId);
+      const b1 = this.getCardById(p, this.selected.botIds[0]);
+      const b2 = this.getCardById(p, this.selected.botIds[1]);
+      if(!this.isTriangle(top,b1,b2)) return;
+
+      const res = this.fixTriangle(p, top,b1,b2);
+      appendLog(`${this.playerName(p)}が${this.phase===PHASE.BUILD?"前半":"後半"}の三角形を固定：${cardText(top)} = ${cardText(b1)} + ${cardText(b2)}`);
+
+      if(this.phase===PHASE.DRAW){
+        this.turnFixRemain[p] = Math.max(0, this.turnFixRemain[p] - 1);
+      }
+
+      this.clearSelection();
+      render();
+
+      if(res.instantWinner){
+        this.finishRoundByInstant(res.instantWinner, this.phase===PHASE.BUILD ? "ビルド中の即勝" : "後半の固定による即勝");
+      }
+    }
+
+    humanDrawFromOpponent(cardId=null){
+      if(this.phase!==PHASE.DRAW || this.privacyLocked) return;
+      const p=this.isPvp()?this.current:"you";
+      if(!this.isPvp() && this.current!=="you") return;
+      if(this.turnStatus[p]!==TURN.NEED_DRAW) return;
+      const o=this.other(p);
+      if(this.hands[o].length===0){
+        const iw=this.checkInstantWin();
+        if(iw){ this.finishRoundByInstant(iw,"相手の手札が0枚"); return; }
+        this.judgeByRule("ドロー不能（相手手札0）");
+        return;
+      }
+      let idx=cardId==null?-1:this.hands[o].findIndex(c=>c.id===cardId);
+      if(idx<0) idx=Math.floor(Math.random()*this.hands[o].length);
+      const card=this.hands[o].splice(idx,1)[0];
+      this.hands[p].push(card);
+      this.sortHand(p);
+      this.drawBackIds=[];
+      this.drawTurns[p]+=1;
+      appendLog(`${this.playerName(p)}が${this.playerName(o)}の裏向き札から1枚ドロー：${cardText(card)}（${this.drawTurns[p]}/${this.cfg.DRAW_TURNS}）`);
+      this.turnStatus[p]=TURN.MAY_FIX;
+      this.turnFixRemain[p]=1;
+      const iw=this.checkInstantWin();
+      if(iw){ this.finishRoundByInstant(iw,"ドロー後の即勝"); return; }
+      render();
+    }
+
+    humanDrawFromCpu(cardId=null){ this.humanDrawFromOpponent(cardId); }
+
+    endHumanTurn(){
+      if(this.phase!==PHASE.DRAW || this.privacyLocked) return;
+      if(this.isPvp()){
+        const p=this.current;
+        if(this.turnStatus[p]===TURN.NEED_DRAW){ appendLog(`${this.playerName(p)}はまだ1枚引いていません。`); return; }
+        this.turnStatus[p]=TURN.NEED_DRAW;
+        this.turnFixRemain[p]=0;
+        this.drawBackIds=[];
+        this.clearSelection();
+        if(this.drawTurns.you>=this.cfg.DRAW_TURNS && this.drawTurns.cpu>=this.cfg.DRAW_TURNS){ this.judgeByRule("双方3ターン完了"); return; }
+        this.current=this.other(p);
+        appendLog(`${this.playerName(this.current)}の番`);
+        render();
+        this.promptHandoff(this.current,"後半の手番交代");
+        return;
+      }
+      if(this.current!=="you") return;
+      if(this.turnStatus.you===TURN.NEED_DRAW){ appendLog("まだ1枚引いていません（この手番はドロー必須）。"); return; }
+      this.turnStatus.you=TURN.NEED_DRAW; this.turnFixRemain.you=0; this.drawBackIds=[]; this.clearSelection();
+      if(this.drawTurns.you>=this.cfg.DRAW_TURNS && this.drawTurns.cpu>=this.cfg.DRAW_TURNS){ this.judgeByRule("双方3ターン完了"); return; }
+      this.current="cpu"; appendLog("CPUの番"); render(); this.cpuTurnFlow();
+    }
+
+    cpuDrawFromYou(){
+      if(this.hands.you.length===0) return null;
+      const idx = Math.floor(Math.random()*this.hands.you.length);
+      const card = this.hands.you.splice(idx,1)[0];
+      this.hands.cpu.push(card);
+      this.sortHand("cpu");
+      return card;
+    }
+
+    async cpuTurnFlow(){
+      if(this.isPvp()) return;
+      if(this.phase!==PHASE.DRAW || this.current!=="cpu" || this.turnStatus.cpu!==TURN.NEED_DRAW) return;
+
+      const myToken = this.cpuTurnToken;
+      const alive = () => (this.cpuTurnToken===myToken) && (this.phase===PHASE.DRAW) && (this.current==="cpu");
+
+      await sleep(this.cfg.CPU_TURN_DELAY_MS);
+      if(!alive()) return;
+
+      const card = this.cpuDrawFromYou();
+      if(!card){
+        const iw=this.checkInstantWin();
+        if(iw){ this.finishRoundByInstant(iw,"相手の手札が0枚"); return; }
+        this.judgeByRule("ドロー不能（あなた手札0）");
+        return;
+      }
+
+      this.drawTurns.cpu += 1;
+      appendLog(`CPUがあなたから1枚ドロー：${cardText(card)}（CPU ${this.drawTurns.cpu}/${this.cfg.DRAW_TURNS}）`);
+      this.turnStatus.cpu = TURN.MAY_FIX;
+      this.turnFixRemain.cpu = 1;
+
+      const iw = this.checkInstantWin();
+      if(iw){
+        this.finishRoundByInstant(iw, "ドロー後の即勝");
+        return;
+      }
+      render();
+
+      await sleep(this.cfg.CPU_TURN_DELAY_MS);
+      if(!alive()) return;
+
+      const level = parseInt(el.cpuLevel.value,10);
+      const tri = this.chooseBestTriangles(this.hands.cpu, 1, level, "cpu")[0];
+      if(tri){
+        const res = this.fixTriangle("cpu", tri.top, tri.b1, tri.b2);
+        if(res.ok){
+          this.turnFixRemain.cpu = 0;
+          appendLog(`CPUが後半の三角形を固定：${cardText(tri.top)} = ${cardText(tri.b1)} + ${cardText(tri.b2)}`);
+          render();
+          if(res.instantWinner){
+            this.finishRoundByInstant(res.instantWinner, "CPU後半固定による即勝");
+            return;
+          }
+        }
+      }else{
+        appendLog("CPUはこのターン三角形を作らず終了");
+      }
+
+      await sleep(220);
+      if(!alive()) return;
+      this.turnStatus.cpu = TURN.NEED_DRAW;
+      this.turnFixRemain.cpu = 0;
+
+      if(this.drawTurns.you>=this.cfg.DRAW_TURNS && this.drawTurns.cpu>=this.cfg.DRAW_TURNS){
+        this.judgeByRule("双方3ターン完了");
+        return;
+      }
+
+      this.current = "you";
+      this.drawBackIds = [];
+      appendLog("あなたの番");
+      render();
+    }
+
+    maybeFx(winner, kind){
+      const instantOn = el.fxInstantOn.checked;
+      const cpuFxOn = el.fxCpuOn.checked;
+      const isCpuWinner = (winner==="cpu");
+      if(kind==="instant" && !instantOn) return;
+      if(!this.isPvp() && isCpuWinner && !cpuFxOn) return;
+      launchConfetti(1.0);
+      playWinSound();
+    }
+
+    // ラウンド終了時の結果を確定して画面に固定する。
+    // 次ラウンドへの移行はプレイヤーのボタン操作だけで行う。
+    completeRound({winner, criterion, why, ptsYou, ptsCpu}){
+      this.phase = PHASE.ROUND_END;
+      this.stopTimers();
+      this.clearSelection();
+      this.lastRoundResult = {
+        round: this.round, winner, criterion, why, ptsYou, ptsCpu,
+        youN: this.hands.you.length, cpuN: this.hands.cpu.length,
+        youS: this.remainingSum("you"), cpuS: this.remainingSum("cpu"),
+        youTris: this.roundTris.you.length, cpuTris: this.roundTris.cpu.length,
+        totalYou: this.seriesScore.you, totalCpu: this.seriesScore.cpu,
+      };
+      render();
+      showRoundModal(this.lastRoundResult);
+    }
+
+    continueAfterRound(){
+      if(this.phase!==PHASE.ROUND_END || !this.lastRoundResult) return;
+      const result = this.lastRoundResult;
+      el.roundModal.classList.remove("show");
+      // 元のルールどおり規定判定でのみ先手を交代。即勝時はそのまま。
+      if(result.criterion!=="instant"){
+        this.firstPlayer = (this.firstPlayer==="you") ? "cpu" : "you";
+      }
+      this.nextRound();  // 最終ラウンドならシリーズ最終結果を表示する
+    }
+
+    finishRoundByInstant(winner, why){
+      if(this.phase===PHASE.ROUND_END || this.phase===PHASE.SERIES_END) return;
+      appendLog(`★即勝！ 勝者：${this.playerName(winner)}（${why}）`);
+      const pts = this.roundTris[winner].length;
+      this.seriesScore[winner] += pts;
+      appendLog(`★ラウンド得点：${this.playerName(winner)} +${pts}点（△${pts}）`);
+      appendLog(`（累計）${this.playerName("you")} ${this.seriesScore.you} / ${this.playerName("cpu")} ${this.seriesScore.cpu}`);
+      this.maybeFx(winner, "instant");
+      this.completeRound({winner, criterion:"instant", why,
+        ptsYou:winner==="you"?pts:0, ptsCpu:winner==="cpu"?pts:0});
+    }
+
+    judgeByRule(why){
+      if(this.phase!==PHASE.DRAW) return;
+      appendLog(`★規定判定（${why}）`);
+      const youN = this.hands.you.length;
+      const cpuN = this.hands.cpu.length;
+      const youS = this.remainingSum("you");
+      const cpuS = this.remainingSum("cpu");
+
+      let winner, criterion;
+      if(youN < cpuN){ winner="you"; criterion="count"; }
+      else if(cpuN < youN){ winner="cpu"; criterion="count"; }
+      else if(youS < cpuS){ winner="you"; criterion="sum"; }
+      else if(cpuS < youS){ winner="cpu"; criterion="sum"; }
+      else { winner="draw"; criterion="draw"; }
+
+      let ptsYou=0, ptsCpu=0;
+      if(winner==="draw"){
+        ptsYou=1; ptsCpu=1;
+        this.seriesScore.you += 1;
+        this.seriesScore.cpu += 1;
+        appendLog("★結果：引き分け（双方 +1点）");
+      }else{
+        const pts = this.roundTris[winner].length;
+        if(winner==="you"){ptsYou=pts;}else{ptsCpu=pts;}
+        this.seriesScore[winner] += pts;
+        appendLog(`★勝者：${winner==="you"?"あなた":"CPU"}（+${pts}点 / △${pts}）`);
+      }
+      appendLog(`（累計）${this.playerName("you")} ${this.seriesScore.you} / ${this.playerName("cpu")} ${this.seriesScore.cpu}`);
+      this.completeRound({winner, criterion, why, ptsYou, ptsCpu});
+    }
+  }
+
+  const game = new GameState(CONFIG);
+
+  // ===== Numeric triangle: vertices and sides reflect the cards selected =====
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function svgEl(name, attrs={}, content=null){
+    const e = document.createElementNS(SVG_NS, name);
+    for(const [k,v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+    if(content!==null) e.textContent = String(content);
+    return e;
+  }
+
+  // All three presentation sizes share a single source of truth for the numbers.
+  function numericTriangleSvg(top, left, right){
+    const complete = !!(top && left && right);
+    const correct = complete && game.isTriangle(top,left,right);
+    const color = complete ? (correct ? "#16a34a" : "#dc2626") : "#2563eb";
+    const svg = svgEl("svg", {viewBox:"0 0 360 280", class:"triangleSvg", role:"img"});
+    const val = c => c ? String(c.rank) : "?";
+    const num = (c, isTop) => c ? (isTop ? game.cardValueTop(c) : game.cardValueBase(c)) : "?";
+    svg.appendChild(svgEl("title", {}, `数字の三角形：上 ${num(top,true)}、左下 ${num(left,false)}、右下 ${num(right,false)}${complete ? (correct ? "。成立" : "。不成立") : "。作成中"}`));
+    svg.appendChild(svgEl("polygon", {
+      points:"180,45 66,215 294,215", fill: complete && correct ? "rgba(22,163,74,.09)" : "rgba(37,99,235,.025)",
+      stroke:"#cbd5e1", "stroke-width":"3", "stroke-dasharray":"7 8", "stroke-linejoin":"round"
+    }));
+    const edges = [[top,left,"M 180 45 L 66 215"], [top,right,"M 180 45 L 294 215"], [left,right,"M 66 215 L 294 215"]];
+    for(const [a,b,path] of edges){
+      if(a && b) svg.appendChild(svgEl("path", {d:path,fill:"none",stroke:color,"stroke-width":complete ? "5" : "4", "stroke-linecap":"round"}));
+    }
+    // Bottom equation symbol is placed in the triangle, without replacing either vertex.
+    if(left && right) svg.appendChild(svgEl("text", {x:180,y:196,"text-anchor":"middle","font-size":"20","font-weight":"800",fill:color}, "+"));
+    const nodes = [
+      {card:top,x:180,y:45,where:"上",isTop:true},
+      {card:left,x:66,y:215,where:"左",isTop:false},
+      {card:right,x:294,y:215,where:"右",isTop:false},
+    ];
+    for(const n of nodes){
+      const g = svgEl("g");
+      const filled = !!n.card;
+      const ring = filled ? (complete ? color : (n.isTop ? "#2563eb" : "#0891b2")) : "#94a3b8";
+      g.appendChild(svgEl("circle", {cx:n.x,cy:n.y,r:35,fill:filled ? "#fff" : "#f1f5f9",stroke:ring,"stroke-width":filled ? "3.5" : "2", "stroke-dasharray": filled ? "none" : "4 5"}));
+      g.appendChild(svgEl("text", {x:n.x,y:n.y - (filled ? 6 : 0),class:"triNodeValue",fill:filled ? (n.card && !isJoker(n.card) && isRedSuit(n.card.suit) ? "#c2410c" : "#0f172a") : "#94a3b8"}, num(n.card,n.isTop)));
+      if(filled) g.appendChild(svgEl("text", {x:n.x,y:n.y+22,class:"triNodeSuit",fill:(!isJoker(n.card) && isRedSuit(n.card.suit)) ? "#dc2626" : "#475569"}, isJoker(n.card) ? "JOKER" : `${rankLabel(n.card.rank)}${n.card.suit}`));
+      g.appendChild(svgEl("text", {x:n.x,y:n.y+53,"text-anchor":"middle","font-size":"12","font-weight":"800",fill:"#64748b"}, n.where));
+      svg.appendChild(g);
+    }
+    return svg;
+  }
+
+  function openTriModal(ownerLabel, t){
+    el.triModalTitle.textContent = `${ownerLabel}の数字の三角形`;
+    const topV = game.cardValueTop(t.top);
+    const leftV = game.cardValueBase(t.bot1);
+    const rightV = game.cardValueBase(t.bot2);
+    el.triModalDesc.textContent = `${cardText(t.top)}＝${cardText(t.bot1)}＋${cardText(t.bot2)}　｜　${topV} ＝ ${leftV} ＋ ${rightV}`;
+    el.triBigRow.replaceChildren(numericTriangleSvg(t.top,t.bot1,t.bot2));
+    el.triModal.classList.add("show");
+  }
+
+  function renderTriLists(){
+    el.triListYou.innerHTML = "";
+    el.triListCpu.innerHTML = "";
+    const makeTriEl = (t, ownerLabel)=>{
+      const w = document.createElement("div");
+      w.className = "triItem";
+      w.setAttribute("role","button");
+      w.setAttribute("tabindex","0");
+      w.setAttribute("aria-label", `${ownerLabel}の数字の三角形を拡大表示`);
+      const picture = document.createElement("div");
+      picture.className="triThumb";
+      picture.appendChild(numericTriangleSvg(t.top,t.bot1,t.bot2));
+      const info = document.createElement("div");
+      info.className = "triResult";
+      const eq = document.createElement("span");
+      eq.className="badge ok";
+      eq.textContent = `${game.cardValueTop(t.top)} = ${game.cardValueBase(t.bot1)} + ${game.cardValueBase(t.bot2)}`;
+      const label = document.createElement("span");
+      label.className = "hint";
+      label.textContent = "タップで拡大 ↗";
+      info.append(eq,label);
+      w.append(picture,info);
+      const open = ()=> openTriModal(ownerLabel,t);
+      w.addEventListener("click",open);
+      w.addEventListener("keydown",e=>{
+        if(e.key==="Enter" || e.key===" ") { e.preventDefault(); open(); }
+      });
+      return w;
+    };
+    for(const t of game.roundTris.you) el.triListYou.appendChild(makeTriEl(t,"あなた"));
+    for(const t of game.roundTris.cpu) el.triListCpu.appendChild(makeTriEl(t,"CPU"));
+    if(game.roundTris.you.length===0){
+      const d=document.createElement("div"); d.className="hint"; d.textContent="まだありません";
+      el.triListYou.appendChild(d);
+    }
+    if(game.roundTris.cpu.length===0){
+      const d=document.createElement("div"); d.className="hint"; d.textContent="まだありません";
+      el.triListCpu.appendChild(d);
+    }
+  }
+
+  // ===== 相手の裏向き手札 =====
+  function renderBacks(){
+    el.backsArea.innerHTML="";
+    if(game.phase!==PHASE.DRAW) return;
+    const p=game.isPvp()?game.current:"you";
+    const o=game.other(p);
+    const canDraw=!game.privacyLocked && (game.isPvp() || game.current==="you") && game.turnStatus[p]===TURN.NEED_DRAW && game.drawTurns[p]<CONFIG.DRAW_TURNS;
+    const n=game.hands[o].length;
+    if(canDraw){
+      const ids=game.hands[o].map(c=>c.id);
+      const validOrder=game.drawBackIds.length===ids.length && game.drawBackIds.every(id=>ids.includes(id));
+      if(!validOrder) game.drawBackIds=shuffle(ids.slice());
+    }
+    const order=canDraw?game.drawBackIds:game.hands[o].map(c=>c.id);
+    for(let i=0;i<order.length;i++){
+      const b=document.createElement("div"); b.className="back"; b.setAttribute("role","button");
+      b.setAttribute("aria-label",`${game.playerName(o)}の裏向きカード${i+1}を選ぶ`);
+      b.setAttribute("aria-disabled",canDraw?"false":"true"); b.tabIndex=canDraw?0:-1; b.innerHTML="<span>?</span>";
+      const id=order[i];
+      b.addEventListener("click",()=>{if(canDraw) game.humanDrawFromOpponent(id);});
+      b.addEventListener("keydown",e=>{if(canDraw&&(e.key==="Enter"||e.key===" ")){e.preventDefault();game.humanDrawFromOpponent(id);}});
+      el.backsArea.appendChild(b);
+    }
+    el.drawHint.textContent=canDraw?`${game.playerName(o)}の手札：${n}枚。好きな位置を1枚選んでください。`:`${game.playerName(o)}の手札：${n}枚。`;
+  }
+
+  // ===== Turn dots =====
+  function dotsHTML(done,total,doneClass){
+    let out="";
+    for(let i=0;i<total;i++) out += i<done ? `<span class="dot ${doneClass}">●</span>` : `<span class="dot todo">●</span>`;
+    return out;
+  }
+
+  function updateTurnBanner(){
+    const build=game.phase===PHASE.BUILD;
+    const draw=game.phase===PHASE.DRAW;
+    const myTurn=draw && game.current==="you";
+    const needDraw=myTurn && game.turnStatus.you===TURN.NEED_DRAW;
+    const mayFix=myTurn && game.turnStatus.you===TURN.MAY_FIX;
+    const fixed=game.turnFixRemain.you;
+
+    el.roundInline.hidden=true;
+    el.stepBuild.classList.toggle("active",build);
+    el.stepBuild.classList.toggle("done",draw||game.phase===PHASE.ROUND_END||game.phase===PHASE.SERIES_END);
+    el.stepDraw.classList.toggle("active",draw);
+    el.stepDraw.classList.toggle("done",game.phase===PHASE.ROUND_END||game.phase===PHASE.SERIES_END);
+    el.stepBuildState.textContent=build?"● いまココ":(draw||game.phase===PHASE.ROUND_END||game.phase===PHASE.SERIES_END)?"✓ 完了":"これから";
+    el.stepDrawState.textContent=draw?"● いまココ":(game.phase===PHASE.ROUND_END||game.phase===PHASE.SERIES_END)?"✓ 完了":"次にやること";
+
+    el.turnBanner.classList.toggle("warn",build&&game.buildRemain<=30);
+    el.turnBanner.classList.toggle("pulse",build&&game.buildRemain<=10&&el.endAlertOn.checked);
+    if(build){
+      const p=Math.max(0,Math.min(1,game.buildRemain/CONFIG.BUILD_TIME));
+      el.buildBar.style.display=""; el.buildBar.style.width=`${Math.round(p*100)}%`;
+    }else{ el.buildBar.style.display="none"; el.buildBar.style.width="0%"; }
+
+    el.btnStartDraw.hidden=!build;
+    el.btnEndTurn.hidden=draw ? (game.isPvp() ? false : !mayFix) : true;
+    el.btnFix.textContent=build?"この三角形を固定する":"この三角形を固定する";
+    el.drawFixGuide.hidden=!draw;
+    el.builder.classList.toggle("draw-mode",draw);
+    const activeTurnP=game.isPvp()?game.current:"you";
+    const activeNeedDraw=draw && (game.isPvp() || game.current==="you") && game.turnStatus[activeTurnP]===TURN.NEED_DRAW;
+    el.drawArea.classList.toggle("draw-ready",activeNeedDraw);
+    el.drawArea.classList.toggle("draw-done",draw&&!activeNeedDraw);
+
+    if(game.isPvp()){
+      const p=game.current, pn=game.playerName(p);
+      if(game.phase===PHASE.IDLE){
+        el.turnBig.textContent="対人3分交代 → 自由ドロー3ターン";
+        el.turnSmall.textContent="前半は各自3分。自動処理なし。交代時は手札を隠して端末を渡します。";
+        el.taskTitle.textContent="対人戦を開始してください"; el.taskDetail.textContent="プレイヤー1・2が1台を交代で使います。";
+        el.turnDots.innerHTML=""; el.handTitle.textContent="ゲーム開始後、手番プレイヤーの手札だけ表示"; el.handInstruction.textContent="交代画面が出たら相手に端末を渡してください。";
+        return;
+      }
+      if(build){
+        el.turnBig.textContent=`前半 ① ${pn}のビルド ／ 残り ${fmtTime(game.buildRemain)}`;
+        el.turnSmall.textContent="持ち時間は各自3分。時間切れでも未固定札は自動処理されません。";
+        el.taskTitle.textContent=`${pn}：できるだけ三角形を作る`;
+        el.taskDetail.textContent="3枚すべて別スート＋上段と下段は反対色。終わったら『ビルド終了（交代）』。";
+        el.handTitle.textContent=`${pn}の手札：${game.hands[p].length}枚`;
+        el.handInstruction.textContent="① 頂点 → ② 左下 → ③ 右下 → 固定";
+        el.turnDots.innerHTML=`<div class="dotsBlock"><span class="label">P1</span>${game.buildDone.you?" ✓":""}</div><div class="dotsBlock"><span class="label">P2</span>${game.buildDone.cpu?" ✓":""}</div>`;
+        el.btnStartDraw.textContent="ビルド終了（交代） →";
+        return;
+      }
+      if(draw){
+        const need=game.turnStatus[p]===TURN.NEED_DRAW, may=game.turnStatus[p]===TURN.MAY_FIX;
+        const youDots=dotsHTML(game.drawTurns.you,CONFIG.DRAW_TURNS,"you"), cpuDots=dotsHTML(game.drawTurns.cpu,CONFIG.DRAW_TURNS,"cpu");
+        el.turnDots.innerHTML=`<div class="dotsBlock"><span class="label">P1</span> ${game.drawTurns.you}/${CONFIG.DRAW_TURNS} <span>${youDots}</span></div><div class="dotsBlock"><span class="label">P2</span> ${game.drawTurns.cpu}/${CONFIG.DRAW_TURNS} <span>${cpuDots}</span></div>`;
+        el.turnBig.textContent=`後半 ② 自由ドロー ／ ${pn}の番`;
+        el.turnSmall.textContent="相手の伏せ札から1枚取る → 自分の手札から最大1組 → ターン終了。";
+        el.handTitle.textContent=`${pn}の手札：${game.hands[p].length}枚`;
+        if(need){ el.taskTitle.textContent=`${pn}：相手の裏向き札から1枚選ぶ`; el.taskDetail.textContent="どの札かは取るまで分かりません。"; el.handInstruction.textContent="まず相手から1枚取ります。"; el.drawAreaTitle.textContent="① 相手の裏向き札から1枚選ぶ"; el.drawAreaDetail.textContent="好きな位置の『？』を押してください。"; }
+        else if(may){ el.taskTitle.textContent=game.turnFixRemain[p]>0?"② 三角形を最大1組作る":"③ ターン終了"; el.taskDetail.textContent="引いた札を使う必要はありません。作らず終了も可能です。"; el.handInstruction.textContent="手札全体から自由に選べます。"; el.drawAreaTitle.textContent="✓ ドロー完了"; el.drawAreaDetail.textContent="三角形を1組作るか、そのまま終了。"; }
+        return;
+      }
+    }
+
+    if(game.phase===PHASE.IDLE){
+      el.turnBig.textContent="全スート別＋上下反対色ビルド → 自分で1枚引く";
+      el.turnSmall.textContent="前半は3枚すべて別スート＋上段と下段は反対色。後半は相手の伏せ札から自分で選んで取ります。";
+      el.taskTitle.textContent="まずはゲーム開始！";
+      el.taskDetail.textContent="前半で手札を整理したあと、自由ドローの3ターン戦へ進みます。";
+      el.turnDots.innerHTML="";
+      el.handTitle.textContent="あなたの手札：開始すると27枚配られます";
+      el.handInstruction.textContent="前半は全スート別＋上下反対色ビルド → 後半は自分で1枚引く";
+      return;
+    }
+    if(build){
+      el.turnBig.textContent=`前半 ① 全スート別＋上下反対色ビルド ／ 残り ${fmtTime(game.buildRemain)}`;
+      el.turnSmall.textContent="両者同時に自分の手札を整理。3枚はすべて別スート、上段と下段2枚は反対色。ジョーカーは任意のスート／色です。";
+      el.taskTitle.textContent="いまやること：全スート別＋上下反対色で三角形を作ろう";
+      el.taskDetail.textContent="頂点 → 左下 → 右下を選び、数字が合い、3枚のスートがすべて違い、さらに下段2枚が上段と反対色なら固定できます。続けて何組でも作れます。";
+      el.handTitle.textContent="あなたの手札：三角形を作る";
+      el.handInstruction.textContent="① 頂点 → ② 左下 → ③ 右下 → 固定（全スート別＋上下反対色）";
+      el.btnStartDraw.textContent="後半へ進む →";
+      el.turnDots.innerHTML="";
+      return;
+    }
+    if(draw){
+      const youDots=dotsHTML(game.drawTurns.you,CONFIG.DRAW_TURNS,"you");
+      const cpuDots=dotsHTML(game.drawTurns.cpu,CONFIG.DRAW_TURNS,"cpu");
+      el.turnDots.innerHTML=`<div class="dotsBlock"><span class="label">あなた</span> <span class="mono">${game.drawTurns.you}/${CONFIG.DRAW_TURNS}</span> <span>${youDots}</span></div><div class="dotsBlock"><span class="label">CPU</span> <span class="mono">${game.drawTurns.cpu}/${CONFIG.DRAW_TURNS}</span> <span>${cpuDots}</span></div>`;
+      el.turnBig.textContent=game.current==="you"?"後半 ② 自分で1枚引く ／ あなたの番":"後半 ② 自分で1枚引く ／ CPUの番";
+      el.turnSmall.textContent="相手から1枚取る（必須） → 手札から自由に三角形を最大1組 → 交代。各3ターン。";
+      el.handTitle.textContent=`あなたの手札：${game.hands.you.length}枚`;
+      if(needDraw){
+        el.taskTitle.textContent="いまやること：① CPUの裏向き札から1枚選ぶ";
+        el.taskDetail.textContent="下の『？』カードを自分で1枚選んでください。どの札かは取るまで分かりません。";
+        el.handInstruction.textContent="まず相手の伏せ札から1枚取ります。";
+        el.drawAreaTitle.textContent="① CPUの裏向き札から1枚選ぶ";
+        el.drawAreaDetail.textContent="好きな位置の『？』を押してください。『おまかせ』でも引けます。";
+      }else if(mayFix){
+        el.taskTitle.textContent=fixed>0?"いまやること：② 手札から三角形を最大1組作る":"いまやること：③ ターン終了";
+        el.taskDetail.textContent=fixed>0?"引いた札を使う必要はありません。手札全体から自由に1組選べます。作らず終了しても構いません。":"このターンの固定は終了です。";
+        el.handInstruction.textContent=fixed>0?"頂点 → 左下 → 右下 → 固定。引いた札に縛られません。":"『ターン終了』でCPUに交代します。";
+        el.drawAreaTitle.textContent="✓ ① ドロー完了：つぎは自由に三角形づくり";
+        el.drawAreaDetail.textContent="このターンはもう引けません。手札から1組作るか、そのままターン終了。";
+      }else{
+        el.taskTitle.textContent="CPUの番";
+        el.taskDetail.textContent="CPUもあなたの手札から1枚をランダムに取り、最大1組作ります。";
+        el.handInstruction.textContent="CPUの番です。";
+        el.drawAreaTitle.textContent="CPUの番：操作は必要ありません";
+        el.drawAreaDetail.textContent="CPUが終わると自動であなたの番になります。";
+      }
+      return;
+    }
+    if(game.phase===PHASE.ROUND_END && game.lastRoundResult){
+      const r=game.lastRoundResult;
+      const outcome=r.winner==="draw"?"引き分け！":`${game.playerName(r.winner)}の勝利！`;
+      el.turnBig.textContent=`ラウンド${r.round} 結果：${outcome}`;
+      el.turnSmall.textContent=getRoundReason(r);
+      el.taskTitle.textContent=`獲得点：${game.playerName("you")} +${r.ptsYou}点 ／ ${game.playerName("cpu")} +${r.ptsCpu}点`;
+      el.taskDetail.textContent=`シリーズ累計：${game.playerName("you")} ${r.totalYou}点 ／ ${game.playerName("cpu")} ${r.totalCpu}点。結果を確認してから次へ進めます。`;
+      el.roundInlineTitle.textContent=`確定結果：${outcome}`;
+      el.roundInlineDetail.textContent=`${getRoundReason(r)}　獲得点：あなた +${r.ptsYou}／CPU +${r.ptsCpu}`;
+      el.btnNextRound.textContent=r.round===CONFIG.SERIES_ROUNDS?"最終結果を見る →":"次のラウンドへ →";
+      el.roundInline.hidden=false;
+    }else{
+      el.turnBig.textContent="シリーズ終了"; el.turnSmall.textContent="最終結果が確定しました。";
+      el.taskTitle.textContent="5ラウンド終了！"; el.taskDetail.textContent="もう一度遊ぶときは『もう一度遊ぶ』を選んでください。";
+      el.roundInline.hidden=true;
+    }
+    el.turnDots.innerHTML="";
+  }
+
+  // ===== Round result =====
+  function getRoundReason(r){
+    if(r.criterion==="instant"){
+      return `手札を0枚にしたため即勝ち（${r.why}）。`;
+    }
+    if(r.criterion==="count"){
+      return `残り手札が少ない方の勝ち：${game.playerName("you")} ${r.youN}枚 ／ ${game.playerName("cpu")} ${r.cpuN}枚。`;
+    }
+    if(r.criterion==="sum"){
+      return `残り手札が同じ${r.youN}枚なので数字合計で判定：${game.playerName("you")} ${r.youS} ／ ${game.playerName("cpu")} ${r.cpuS}。`;
+    }
+    return `残り手札が双方${r.youN}枚、数字合計も双方${r.youS}で同じため引き分け。`;
+  }
+
+  function showRoundModal(r){
+    if(!r || game.phase!==PHASE.ROUND_END) return;
+    el.roundModalTitle.textContent = `第${r.round}ラウンドの結果`;
+    el.roundModalStep.textContent = `${r.round} / ${CONFIG.SERIES_ROUNDS} ラウンド`;
+    el.roundHero.className = "roundHero" + (r.winner==="cpu"?" cpu":r.winner==="draw"?" draw":"");
+    el.roundResultType.textContent = r.criterion==="instant" ? "即勝ち！ 手札が0枚になった" : "3ターン終了・勝敗判定";
+    el.roundWinner.textContent = r.winner==="draw" ? "引き分け！" : `${game.playerName(r.winner)}の勝利！`;
+    el.roundReason.textContent = getRoundReason(r);
+    el.roundCountRow.classList.toggle("decisive", r.criterion==="count" || r.criterion==="instant");
+    el.roundSumRow.classList.toggle("decisive", r.criterion==="sum");
+    el.roundYouCount.textContent = `${r.youN} 枚`;
+    el.roundCpuCount.textContent = `${r.cpuN} 枚`;
+    el.roundYouSum.textContent = `${r.youS}`;
+    el.roundCpuSum.textContent = `${r.cpuS}`;
+    el.roundYouTris.textContent = `${r.youTris} 組`;
+    el.roundCpuTris.textContent = `${r.cpuTris} 組`;
+    for(const td of [el.roundYouCount,el.roundCpuCount,el.roundYouSum,el.roundCpuSum]) td.classList.remove("best");
+    if(r.winner!=="draw"){
+      const id=r.winner==="you"?"roundYou":"roundCpu";
+      const winnerCell=$(id+(r.criterion==="sum"?"Sum":"Count"));
+      winnerCell.classList.add("best");
+    }
+    el.roundYouPts.textContent = `+${r.ptsYou} 点`;
+    el.roundCpuPts.textContent = `+${r.ptsCpu} 点`;
+    el.roundYouTotal.textContent = `シリーズ累計 ${r.totalYou} 点`;
+    el.roundCpuTotal.textContent = `シリーズ累計 ${r.totalCpu} 点`;
+    el.roundPointExplain.textContent = r.winner==="draw" ? "引き分けは双方1点。作った三角形の数によらず同じ得点です。" : `このラウンドの勝者は、自分が作った三角形${r.winner==="you"?r.youTris:r.cpuTris}組がそのまま獲得点になります。敗者の獲得点は0点です。`;
+    el.btnRoundContinue.textContent = r.round===CONFIG.SERIES_ROUNDS ? "シリーズ最終結果を見る →" : "次のラウンドへ →";
+    el.roundModal.classList.add("show");
+  }
+
+  // ===== Series modal =====
+  function showSeriesModal(winner){
+    const you = game.seriesScore.you;
+    const cpu = game.seriesScore.cpu;
+
+    el.seriesScoreLine.textContent = `${game.playerName("you")} ${you} / ${game.playerName("cpu")} ${cpu}`;
+
+    if(winner==="you"){
+      el.seriesWinnerText.textContent = `${game.playerName("you")}の勝ち！`;
+      el.seriesNote.textContent = "おめでとう！";
+    }else if(winner==="cpu"){
+      el.seriesWinnerText.textContent = `${game.playerName("cpu")}の勝ち！`;
+      el.seriesNote.textContent = game.isPvp() ? "シリーズ終了！" : (el.fxCpuOn.checked ? "CPU演出ONなので大演出しました。" : "CPU演出OFFのため演出は控えめです。");
+    }else{
+      el.seriesWinnerText.textContent = "引き分け！";
+      el.seriesNote.textContent = "同点優勝（双方の健闘！）。";
+    }
+
+    el.seriesModal.classList.add("show");
+  }
+
+  // ===== Render =====
+  function render(){
+    el.seriesTotal.textContent = String(CONFIG.SERIES_ROUNDS);
+    el.seriesTotal2.textContent = String(CONFIG.SERIES_ROUNDS);
+    el.seriesTotal3.textContent = String(CONFIG.SERIES_ROUNDS);
+
+
+    if(game.isPvp()){
+      el.stepBuildDesc.innerHTML='各自の手札で三角形を作る。<b>3枚すべて別スート</b>＋<b>上段と下段は反対色</b>。プレイヤー1・2が交代で<b>各3分</b>。自動処理なし。';
+      el.stepDrawDesc.innerHTML='相手の裏向き手札から<b>自分で1枚選んで取る</b> → 自由に最大1組 → 交代。各3ターン。';
+      el.modeMemo.innerHTML='<b>対人モード：</b>交代画面が出たら相手に手札が見えないよう端末を渡してください。固定済み三角形は公開情報です。残り数字合計とログは対戦中は非公開です。';
+    }else{
+      el.stepBuildDesc.innerHTML='あなたは3分以内にビルド。<b>3枚すべて別スート</b>＋<b>上段と下段は反対色</b>。未固定分の自動処理はなし。';
+      el.stepDrawDesc.innerHTML='相手の裏向き手札から1枚取り、自由に最大1組。各3ターン。';
+      el.modeMemo.innerHTML='<b>CPUモード：</b>CPUは自分のビルドを自動で行いますが、あなたの未固定札は時間切れでも自動処理しません。';
+    }
+    el.roundNo.textContent = game.round || "-";
+    el.phaseText.textContent =
+      game.phase===PHASE.IDLE ? "未開始" :
+      game.phase===PHASE.BUILD ? (game.isPvp()?`前半：${game.playerName(game.current)}ビルド`:"前半：全スート別＋上下反対色ビルド") :
+      game.phase===PHASE.DRAW ? "後半：自分で1枚引く" :
+      game.phase===PHASE.ROUND_END ? "ラウンド終了" :
+      "シリーズ終了";
+
+    el.firstPlayerText.textContent = game.playerName(game.firstPlayer);
+    el.firstPlayerLabel.textContent = "後半先手";
+    const n1=game.playerName("you"), n2=game.playerName("cpu");
+    el.labelYouScore.textContent=`${n1}：合計得点`; el.labelCpuScore.textContent=`${n2}：合計得点`;
+    el.labelYouSum.textContent=`${n1}：残り札合計`; el.labelCpuSum.textContent=`${n2}：残り札合計`;
+    el.triListYouLabel.textContent=`${n1}の固定三角形`; el.triListCpuLabel.textContent=`${n2}の固定三角形`;
+    el.roundHeadYou.textContent=n1; el.roundHeadCpu.textContent=n2;
+    el.roundPtLabelYou.textContent=`${n1}の獲得点`; el.roundPtLabelCpu.textContent=`${n2}の獲得点`;
+    el.cpuLevelPill.classList.toggle("modeHidden", game.isPvp());
+    el.fxCpuPill.classList.toggle("modeHidden", game.isPvp());
+    el.logPanel.classList.toggle("modeHidden", game.isPvp());
+    el.mainGrid.classList.toggle("pvpMode", game.isPvp());
+    el.buildTimeText.textContent = (game.phase===PHASE.BUILD) ? fmtTime(game.buildRemain) : "--:--";
+    el.timeBadge.hidden = game.phase!==PHASE.BUILD;
+
+    el.scoreYou.textContent = game.seriesScore.you;
+    el.scoreCpu.textContent = game.seriesScore.cpu;
+    el.trisYou.textContent = game.roundTris.you.length;
+    el.trisCpu.textContent = game.roundTris.cpu.length;
+    el.handYou.textContent = game.hands.you.length;
+    el.handCpu.textContent = game.hands.cpu.length;
+    const revealSums = !game.isPvp() || game.phase===PHASE.ROUND_END || game.phase===PHASE.SERIES_END;
+    el.sumYou.textContent = revealSums ? game.remainingSum("you") : "非公開";
+    el.sumCpu.textContent = revealSums ? game.remainingSum("cpu") : "非公開";
+
+    // 後半は1ターン最大1組。
+    const fixMax = 1;
+
+    el.btnStartDraw.disabled = !(game.phase===PHASE.BUILD) || (!game.isPvp() && !game.builtThisBuild.cpu);
+    const activeP=game.isPvp()?game.current:"you";
+    el.btnEndTurn.disabled = !(game.phase===PHASE.DRAW && !game.privacyLocked && (game.isPvp() || game.current==="you") && game.turnStatus[activeP]===TURN.MAY_FIX);
+    el.btnDraw.disabled = !(game.phase===PHASE.DRAW && !game.privacyLocked && (game.isPvp() || game.current==="you") && game.turnStatus[activeP]===TURN.NEED_DRAW);
+
+    el.drawArea.style.display = (game.phase===PHASE.DRAW) ? "" : "none";
+    if(game.phase===PHASE.DRAW) renderBacks();
+
+    el.handArea.innerHTML = "";
+
+    // 閾値統一：720px未満はgrid2、それ以外は（980px未満ならscrollX）で扱う
+    const w = window.innerWidth;
+    el.handArea.classList.toggle("grid2", w < 780);
+    el.handArea.classList.toggle("scrollX", false);
+
+    const topId = game.selected.topId;
+    const botIds = new Set(game.selected.botIds);
+
+    const visiblePlayer=game.isPvp()?game.current:"you";
+    for(const c of game.hands[visiblePlayer]){
+      const b = document.createElement("div");
+      b.className = "cardBtn " + (isJoker(c)?"joker":(isRedSuit(c.suit)?"red":""));
+      if(c.id===topId) b.classList.add("selTop");
+      if(botIds.has(c.id)) b.classList.add("selBot");
+      b.title = cardText(c);
+      b.innerHTML = isJoker(c)
+        ? `<div class="rk">0</div><div class="st">JOKER</div>`
+        : `<div class="rk">${rankLabel(c.rank)}</div><div class="st">${c.suit}</div>`;
+      b.addEventListener("click", ()=> game.onClickCard(c.id));
+      el.handArea.appendChild(b);
+    }
+
+    const top = topId ? game.getCardById(visiblePlayer, topId) : null;
+    const bots = game.selected.botIds.map(id => game.getCardById(visiblePlayer, id)).filter(Boolean);
+
+    el.selTopText.textContent = top ? `${cardText(top)}（上段値=${game.cardValueTop(top)}）` : "未選択";
+    if(bots.length===0){
+      el.selBotText.textContent = "未選択";
+    }else{
+      const sum = bots.reduce((a,c)=>a+game.cardValueBase(c),0);
+      el.selBotText.textContent = bots.map(c=>`${cardText(c)}(${game.cardValueBase(c)})`).join(" + ") + ` = ${sum}`;
+    }
+
+    const mathOnly = !!(top && bots.length===2 && game.cardValueTop(top)===(game.cardValueBase(bots[0])+game.cardValueBase(bots[1])));
+    const triangleOk = !!(top && bots.length===2 && game.isTriangle(top,bots[0],bots[1]));
+    const valid = !!triangleOk;
+    el.triDrawing.replaceChildren(numericTriangleSvg(top,bots[0] || null,bots[1] || null));
+    if(top && bots.length===2){
+      const a=game.cardValueTop(top), b=game.cardValueBase(bots[0]), c=game.cardValueBase(bots[1]);
+      if(game.phase===PHASE.BUILD && mathOnly && !triangleOk){
+        el.triEquation.textContent=`${a} ＝ ${b} ＋ ${c}　× 前半は「3枚すべて別スート」かつ「上段と下段は反対色」です`;
+        el.triEquation.className="triEquation bad";
+      }else{
+        el.triEquation.textContent=`${a} ${mathOnly ? "＝" : "≠"} ${b} ＋ ${c}　${valid ? "✓ 有効な三角形！" : "数字が合いません"}`;
+        el.triEquation.className="triEquation "+(valid?"good":"bad");
+      }
+    }else{
+      el.triEquation.textContent = !top ? "まず頂点のカードを選択" : bots.length===0 ? "次に左下のカードを選択" : "最後に右下のカードを選択";
+      el.triEquation.className = "triEquation waiting";
+    }
+    el.triOkBadge.textContent = valid ? "判定：OK" : (top && bots.length===2 ? "判定：NG" : "判定：-");
+    el.triOkBadge.className = "badge " + (valid ? "ok":"");
+    if(top && bots.length===2 && !valid) el.triOkBadge.classList.add("ng");
+
+    el.btnFix.disabled = !(valid && game.canHumanSelectAndFix());
+
+    renderTriLists();
+    updateTurnBanner();
+  }
+
+  // ===== UI events =====
+  el.btnFix.addEventListener("click", ()=> game.fixSelectedTriangle());
+  el.btnClearSel.addEventListener("click", ()=> { game.clearSelection(); render(); });
+
+  el.btnStart.addEventListener("click", ()=>{
+    if(game.phase!==PHASE.IDLE && game.phase!==PHASE.SERIES_END) return;
+    el.seriesModal.classList.remove("show");
+    game.startSeries();
+    el.btnStart.disabled = true;
+    el.gameMode.disabled = true;
+  });
+
+  el.btnNew.addEventListener("click", ()=>{
+    game.stopTimers();
+    game.resetAll();
+    el.btnStart.disabled = false;
+    el.gameMode.disabled = false;
+    el.handoffScreen.classList.remove("show");
+    el.seriesModal.classList.remove("show");
+    el.roundModal.classList.remove("show");
+    clearLog();
+    appendLog("リセットしました。");
+    render();
+  });
+
+  el.btnNewSeries.addEventListener("click", ()=>{
+    el.seriesModal.classList.remove("show");
+    // 既存ログを残したいならclearLog()しない。ここは流れ優先で残す。
+    appendLog("=== もう一度（新シリーズ） ===");
+    game.startSeries();
+    el.btnStart.disabled = true;
+  });
+
+  el.btnStartDraw.addEventListener("click", ()=>{
+    if(game.phase!==PHASE.BUILD) return;
+    if(game.isPvp()) game.finishPvpBuildTurn("手動終了");
+    else game.startDrawPhase("手動終了（未固定分はそのまま）");
+  });
+
+  el.btnInspectBoard.addEventListener("click", ()=> el.roundModal.classList.remove("show"));
+  el.btnReviewRound.addEventListener("click", ()=> showRoundModal(game.lastRoundResult));
+  el.btnNextRound.addEventListener("click", ()=> game.continueAfterRound());
+  el.btnRoundContinue.addEventListener("click", ()=> game.continueAfterRound());
+
+  el.btnEndTurn.addEventListener("click", ()=> game.endHumanTurn());
+  el.btnDraw.addEventListener("click", ()=> game.humanDrawFromOpponent());
+
+  el.btnCopyLog.addEventListener("click", async ()=>{
+    try{
+      await navigator.clipboard.writeText(logBuffer.join("\n"));
+      appendLog("（ログをクリップボードにコピーしました）");
+    }catch(e){
+      appendLog("（ログのコピーに失敗：ブラウザの権限をご確認ください）");
+    }
+  });
+  el.btnClearLog.addEventListener("click", ()=>{ clearLog(); appendLog("（ログを消去しました）"); });
+
+  el.btnRules.addEventListener("click", ()=> el.rulesModal.classList.add("show"));
+  el.btnCloseRules.addEventListener("click", ()=> el.rulesModal.classList.remove("show"));
+  el.rulesModal.addEventListener("click", (e)=>{ if(e.target===el.rulesModal) el.rulesModal.classList.remove("show"); });
+
+  el.btnCloseTri.addEventListener("click", ()=> el.triModal.classList.remove("show"));
+  el.triModal.addEventListener("click", (e)=>{ if(e.target===el.triModal) el.triModal.classList.remove("show"); });
+
+  const closeSeries = ()=> el.seriesModal.classList.remove("show");
+  el.btnCloseSeries.addEventListener("click", closeSeries);
+  el.btnCloseSeries2.addEventListener("click", closeSeries);
+
+  // シリーズモーダルもバックドロップクリックで閉じる（残り背景対策）
+  el.seriesModal.addEventListener("click", (e)=>{
+    if(e.target===el.seriesModal) el.seriesModal.classList.remove("show");
+  });
+
+  el.handSort.addEventListener("change", ()=>{
+    if(game.isPvp()) game.sortHand(game.current); else game.sortHand("you");
+    render();
+  });
+
+  el.gameMode.addEventListener("change", ()=>{
+    if(game.started && game.phase!==PHASE.IDLE && game.phase!==PHASE.SERIES_END) return;
+    game.mode=el.gameMode.value; render();
+  });
+  el.btnHandoffReady.addEventListener("click", ()=>game.resumeHandoff());
+
+  window.addEventListener("resize", ()=>render());
+
+  function init(){
+    appendLog("アプリ起動：カード・トライアングル v2.0.1（CPU初期／対人3分交代モード／自動処理なし）");
+    appendLog("まず「ゲーム開始」を押してください。");
+    render();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
+
+
